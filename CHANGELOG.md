@@ -1,66 +1,52 @@
-# Changelog
+# 更新说明
 
 ## v1.23.0-ai.1
 
-Personal fork of Orgzly Revived (GPLv3) with AI-assisted planning and outline/UX
-improvements. Org file format compatibility is preserved.
+Orgzly Revived（GPLv3）的个人 Fork，增加 AI 辅助任务规划与大纲/体验改进。
+完全兼容 Org 文件格式。
 
-### Added
+### 新增功能
 
-- **AI task decomposition** (`AI 分解`)
-  - Long-press a single note → generate one level of subtasks.
-  - Per-run options: subtask count (1–20, default follows settings) and an optional
-    refine hint; "Regenerate" lets you change both before retrying.
-  - Context sent to the AI: note title, ancestor headline chain and the note body.
-  - Works with any OpenAI-compatible chat-completions endpoint; settings screen with
-    API base URL, API key, model and a "Test connection" action.
-  - Robust parsing of JSON string arrays, `{"title","content"}` object arrays,
-    `{"subtasks":[...]}` wrappers and fenced/plain text.
-  - Generates subtasks as TODO items and refreshes parent statistics automatically.
+- **AI 任务分解**（`AI 分解`）
+  - 长按单个笔记，自动生成“一层”子任务。
+  - 每次可设置：子任务数量（1–20，默认跟随设置）与可选的“微调提示词”；点“重新生成”可修改数量/提示词后重试。
+  - 发送给 AI 的上下文：笔记标题、祖先进程链、笔记正文。
+  - 兼容任意 OpenAI 格式的 chat/completions 接口；设置页可配置 API 地址、API Key、模型，并提供“测试连接”。
+  - 容错解析：纯字符串数组、`{"title","content"}` 对象数组、`{"subtasks":[...]}` 包装、以及代码块/纯文本兜底。
+  - 生成的子任务默认为 TODO，并自动刷新父任务统计。
 
-- **AI polish** (`AI 完善`)
-  - Sends a whole note subtree (all headings + bodies) to the AI and replaces it with
-    the returned Org outline after a preview step.
-  - Optional refine hint; longer request timeout and output limits for large outlines.
+- **AI 完善**（`AI 完善`）
+  - 将整棵笔记子树（所有标题 + 正文）发给 AI，预览确认后用返回的 Org 大纲整体替换。
+  - 支持可选微调提示词；对长文本使用更长的请求超时与输出上限。
 
-- **Today view as the landing page**
-  - Groups: Overdue, Due today, Scheduled today, Repeating today.
-  - Overdue includes both past `DEADLINE` and past `SCHEDULED` open tasks.
-  - Repeating tasks are matched by computing the next occurrence from the repeater
-    (day/week/month/year/hour) and use a 1-year activity window.
-  - Header statistics: completed `x/y` plus estimated/spent time
-    (`EFFORT` and manual stopwatch).
-  - Colored group accents as soft tints (no colored borders), mini progress bars for
-    `[%]`/`[x/y]`, timestamps, one-tap circular complete button.
-  - Row spacing setting (compact/comfortable), pull-to-refresh, settings shortcut.
-  - Tapping a task opens that note for editing.
+- **今日视图作为启动页**
+  - 分组：逾期、今天截止、今天计划、今日循环。
+  - 逾期同时包含“已过期的 DEADLINE”与“已过期的 SCHEDULED”未完成任务。
+  - 循环任务按重复器推算“下次执行日 = 今天”（天/周/月/年/小时），并设有 1 年活跃期。
+  - 顶部统计：已完成 `x/y`，以及预计/已用时间（`EFFORT` 与手动秒表）。
+  - 分组浅色填充（无彩色边框）、`[%]`/`[x/y]` 迷你进度条、时间戳、一键完成圆钮。
+  - 行间距设置（紧凑/舒适）、下拉刷新、设置入口。
+  - 点击条目直接打开该笔记进行编辑。
 
-- **Outline colour scale**
-  - Long-press a top-level note to pick an accent color (or clear it).
-  - The subtree is shaded in stepped tones by depth, starting from the bullet to the
-    right of the row; soft blends avoid garish solid colours.
+- **大纲色阶**
+  - 长按顶层节点选择主题色（或无颜色）。
+  - 其子树从圆形节点右侧开始，按层级用同色相阶梯色填充；柔和渐变、不刺眼。
 
-- **Manual stopwatch**
-  - Per-note start/stop with wall-clock based accumulation (screen-off safe).
-  - Stored only in private properties `CLOCK_START` / `CLOCKED_SECONDS`.
-  - Container rows show subtree totals, kept in memory and refreshed on change.
+- **手动秒表**
+  - 每个笔记可开始/停止计时，基于真实时钟累计（熄屏安全）。
+  - 仅存于私有属性 `CLOCK_START` / `CLOCKED_SECONDS`。
+  - 父/容器行显示子树合计，内存缓存、变更即时刷新。
 
-- **Widget improvements**
-  - Larger header, list padding, todo-tinted check icon, page/card colour layering,
-    header/date polish and more.
+- **小组件改进**
+  - 顶栏加高、列表留白、待办勾选图标主题色、页面/卡片分层配色等。
 
-- **Other**
-  - SAF tree URI repositories are decoded to readable local file paths in the
-    notebooks list; tapping opens the folder (falls back to copying the path).
-  - "Add to calendar" action for notes with SCHEDULED/DEADLINE (system calendar
-    ACTION_INSERT, verified with reminders).
-  - Optional "Sync on app open" and "Sync after changes" switches, independent of the
-    auto-sync master switch.
-  - Performance work: whole-book stats computed in memory, deferred recompute,
-    faster list queries.
+- **其他**
+  - 笔记本列表中把 SAF 树状 URI 解码为可读的本地文件路径，点击可打开文件夹（无法打开时复制路径）。
+  - 为带 SCHEDULED/DEADLINE 的笔记增加“添加到日历”（系统日历 ACTION_INSERT，已验证提醒）。
+  - 新增独立开关“打开应用时同步”“修改后同步”，不受自动同步总开关限制。
+  - 性能优化：整册统计在内存中计算、打开书延迟重算、列表查询更快。
 
-### Notes
+### 说明
 
-- This is a personal fork; upstream project and license are unchanged (GPLv3).
-- Debug APKs attached to releases are signed with the Android debug key and are
-  intended for testing only.
+- 本项目为个人 Fork；上游项目与许可证均未改变（GPLv3）。
+- Release 中附带的 APK 使用 Android 调试签名，仅供测试安装使用。

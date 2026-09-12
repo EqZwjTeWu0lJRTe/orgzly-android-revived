@@ -8,16 +8,11 @@
 
 * Orgzly Revived
 
-Orgzly is an outliner for taking notes and managing to-do lists. Orgzly Revived is a community-maintained version of Orgzly, as the development of the original app has been halted. The original Orgzly source code can be found
-[[https://github.com/orgzly/orgzly-android][here]].
+Orgzly 是一款用于记笔记、管理待办清单的大纲（outliner）应用。Orgzly Revived 是社区维护版本，因为原版 Orgzly 的开发已经停止。原版 Orgzly 源码可在[[https://github.com/orgzly/orgzly-android][此处]]找到。
 
-With Orgzly, you can keep notebooks stored in plain-text and have them synchronized
-with a directory on your mobile device or an SD card, WebDAV server, or Dropbox.
+使用 Orgzly，你可以把以纯文本保存的笔记本与移动设备上的目录、SD 卡、WebDAV 服务器或 Dropbox 进行同步。
 
-Notebooks are saved in /Org mode/'s file format. “Org mode is for
-keeping notes, maintaining TODO lists, planning projects, and
-authoring documents with a fast and effective plain-text system.” See
-http://orgmode.org for more information.
+笔记本以 /Org mode/ 的文件格式保存。“Org mode 用于快速而高效的纯文本记录：记笔记、维护 TODO 清单、规划项目、撰写文档。”更多信息见 http://orgmode.org 。
 
 #+BEGIN_HTML
 <a href="https://f-droid.org/packages/com.orgzlyrevived">
@@ -33,92 +28,78 @@ http://orgmode.org for more information.
 </a>
 #+END_HTML
 
-The Orgzly Revived project aims to continue development of the Orgzly application. The rebranding is due to the disappearance of the Orgzly author so we, as the community, had to come up with a new solution. We plan to continue adding useful features, fixing bugs, keeping up-to-date with technological evolution, and generally maintaining the [[https://orgmode.org/][Org Mode]] outreach and its support on Android. Orgzly Revived is a community-maintained version of Orgzly, as the development of the original app is no longer active.
+Orgzly Revived 项目旨在延续 Orgzly 应用的开发。由于原 Orgzly 作者的消失，社区不得不寻求新的方案，因而更名。我们计划持续添加实用功能、修复缺陷、跟进技术演进，并总体上维护 [[https://orgmode.org/][Org Mode]] 在 Android 上的推广与支持。Orgzly Revived 是社区维护版本，原版应用的开发已不再活跃。
 
-* This fork (AI & outline enhancements)
+* 本 Fork 的改动（AI 与大纲增强）
 
-This repository is a personal fork of [[https://github.com/orgzly-revived/orgzly-android-revived][Orgzly Revived]] (GPLv3) adding AI-assisted
-task planning and several outline/UX improvements. It keeps full compatibility with
-the Org file format and with upstream behaviour.
+本仓库是 [[https://github.com/orgzly-revived/orgzly-android-revived][Orgzly Revived]]（GPLv3）的个人 Fork，增加了 AI 辅助任务规划与若干大纲/体验改进。完全兼容 Org 文件格式，并保持上游行为。
 
-** Added features
+** 新增功能
 
-- *AI task decomposition ("AI decompose")*: long-press a note and generate one level
-  of subtasks through any OpenAI-compatible API. Offers per-run options (subtask count
-  and an optional refine hint) and re-generation. Context sent can include the note
-  title, its ancestor chain and its body.
-- *AI polish*: send a whole note subtree (headings + bodies) to the AI and replace it
-  with the improved Org outline after previewing the result.
-- *Today view as the landing page*: groups Overdue, Due today, Scheduled today and
-  Repeating today (with a 1-year activity window for repeating tasks), completion and
-  time statistics (EFFORT / stopwatch), coloured group fills, mini progress bars,
-  one-tap complete, pull-to-refresh and a settings shortcut.
-- *Outline colour scale*: long-press a top-level note to pick an accent colour; its
-  subtree is shaded in stepped tones by depth (soft, never garish solid colours).
-- *Manual stopwatch* per note (screen-off safe) with subtree totals, stored only in
-  private =:PROPERTIES:= so files stay compatible.
-- Widget polish, SAF repository path decoding, calendar export helper and other fixes.
+- *AI 任务分解（“AI 分解”）*：长按某个笔记，通过任意 OpenAI 兼容接口自动生成“一层”子任务。每次可现场设置子任务数量与可选的“微调提示词”，支持重新生成；发送给 AI 的上下文可包含标题、祖先进程链与正文。
+- *AI 完善*：将整棵笔记子树（标题 + 正文）发给 AI，预览确认后用返回的 Org 大纲整体替换。
+- *今日视图作为启动页*：分组显示“逾期 / 今天截止 / 今天计划 / 今日循环”（循环任务带 1 年活跃期），显示完成进度与时间统计（EFFORT / 秒表），分组浅色填充、迷你进度条、一键完成、下拉刷新与设置入口。
+- *大纲色阶*：长按顶层节点选择主题色，其子树按层级用同色相阶梯色填充，柔和自然、不刺眼。
+- *手动秒表*：每个笔记可开始/停止计时（熄屏安全），父行显示子树合计，仅存于私有 =:PROPERTIES:=，不影响文件格式。
+- 小组件美化、SAF 仓库路径解码、日历导出、以及其他修复。
 
-** Build this fork
+** 构建本 Fork
 
 #+begin_src shell
 ./gradlew :app:assembleFdroidDebug
 #+end_src
 
-The APK is written to =app/build/outputs/apk/fdroid/debug/=.
+生成的 APK 位于 =app/build/outputs/apk/fdroid/debug/=。
 
-** License
+** 许可证
 
-Distributed under the GNU General Public License v3, same as upstream.
-See [[file:LICENSE]].
+遵循 GNU 通用公共许可证 v3（与上游一致）。参见 [[file:LICENSE]]。
 
+* 支持
 
-* Support 
+- 参见详细的[[https://github.com/orgzly-revived/documentation][终端用户文档]]
+- 在 [[https://github.com/orgzly-revived/orgzly-android-revived/discussions][Discussions]] 提问
+- 也欢迎加入 Matrix 聊天室：[[https://matrix.to/#/#orgzly:matrix.org][#orgzly:matrix.org]]
 
-- See the detailed [[https://github.com/orgzly-revived/documentation][End-user documentation]]
-- Ask your question in the [[https://github.com/orgzly-revived/orgzly-android-revived/discussions][Discussions]]
-- There is also a Matrix chat room where anyone is welcome to join: [[https://matrix.to/#/#orgzly:matrix.org][#orgzly:matrix.org]].
+* 校验 APK 签名
 
-* Verifying the APK signature
-
-This is the SHA-256 checksum of our APK signing certificate, so that you can verify your downloaded APK using tools such as [[https://github.com/soupslurpr/AppVerifier][AppVerifier]] or [[https://developer.android.com/tools/apksigner][apksigner]]:
+以下是 APK 签名证书的 SHA-256 校验和，可用于验证你下载的 APK，工具如 [[https://github.com/soupslurpr/AppVerifier][AppVerifier]] 或 [[https://developer.android.com/tools/apksigner][apksigner]]：
 
 #+begin_quote
 com.orgzlyrevived 6F:C9:C2:E2:2D:07:D2:5C:E7:7E:2E:96:34:55:05:3C:38:B8:31:8A:1A:24:91:B3:ED:95:D5:0C:BA:85:49:3D
 #+end_quote
 
-You should also check that this checksum matches the one published at [[https://orgzlyrevived.com/docs#verify-apk-signature][orgzlyrevived.com]].
+你还应确认该校验和与 [[https://orgzlyrevived.com/docs#verify-apk-signature][orgzlyrevived.com]] 上公布的一致。
 
-Once you have installed the APK, Android should refuse to update the app to any new version which was not signed by the same private key.
+安装 APK 后，Android 将拒绝把应用升级到任何未使用同一私钥签名的新版本。
 
-* Building & testing
+* 构建与测试
 
-If you don't use Android Studio and wish to [[https://developer.android.com/studio/build/building-cmdline.html][build]] and [[https://developer.android.com/studio/test/command-line.html][test]] the app from command line, the standard set of Gradle tasks is available. For example:
+如果你不使用 Android Studio，并希望从命令行[[https://developer.android.com/studio/build/building-cmdline.html][构建]]和[[https://developer.android.com/studio/test/command-line.html][测试]]应用，可使用标准的 Gradle 任务。例如：
 
-- ~./gradlew build~ builds the project and generates APK files
-- ~./gradlew connectedAndroidTest~ runs instrumented unit tests
+- ~./gradlew build~ 构建项目并生成 APK
+- ~./gradlew connectedAndroidTest~ 运行设备端（instrumented）单元测试
 
-Make sure you [[https://developer.android.com/training/testing/espresso/setup][turn off animations]] for the device you're testing on.
+请确保为你的测试设备[[https://developer.android.com/training/testing/espresso/setup][关闭动画]]。
 
 ** Nix
 
-If you are using Nix/NixOS, a flake with a =devShell= exists and can be used via [[https://direnv.net/][direnv]].
+若你使用 Nix/NixOS，项目提供了含 =devShell= 的 flake，可通过 [[https://direnv.net/][direnv]] 使用。
 
-# TODO remove this when the issue is fixed and flake is bumped past the fix
-Due to [[https://github.com/NixOS/nixpkgs/issues/402297][this nixpkgs issue]], you must run gradle like this:
+# 当该问题修复且 flake 更新后，删除此 TODO
+由于[[https://github.com/NixOS/nixpkgs/issues/402297][这个 nixpkgs 问题]]，你必须这样运行 gradle：
 
 #+begin_src shell
 gradle $GRADLE_OPTS app:assembleDebug
 #+end_src
 
-* Contributing
+* 参与贡献
 
-Please feel free to get involved in the project on GitHub by contributing issues, ideas, or features! 
-Translations can be contributed on the [[https://toolate.othing.xyz/projects/orgzly-revived/][Toolate]] i18n platform.
-We generally plan to leave existing open issues in the original 
-[[https://github.com/orgzly/orgzly-android][repository]] and reference them here as 
-they are addressed.
+欢迎在 GitHub 上通过提交 issue、想法或功能参与项目！
+翻译可通过 [[https://toolate.othing.xyz/projects/orgzly-revived/][Toolate]] 国际化平台贡献。
+对于已有的开放 issue，我们通常保留在原
+[[https://github.com/orgzly/orgzly-android][仓库]]中，并在处理时在此引用。
 
-* License
+* 许可证
 
-The project is licensed under the [[https://github.com/orgzly-revived/orgzly-android-revived/blob/master/LICENSE][GNU General Public License version 3 (or newer)]].
+本项目基于 [[https://github.com/orgzly-revived/orgzly-android-revived/blob/master/LICENSE][GNU 通用公共许可证第 3 版（或更新）]] 授权。
