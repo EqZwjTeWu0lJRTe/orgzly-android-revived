@@ -1,0 +1,115 @@
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="AlwaysShowAction">
+
+    <item
+        android:id="@+id/cut"
+        android:icon="@drawable/ic_content_cut"
+        app:showAsAction="always"
+        android:title="@string/cut">
+    </item>
+
+    <item
+        android:id="@+id/copy"
+        android:icon="@drawable/ic_content_copy"
+        app:showAsAction="always"
+        android:title="@string/copy">
+    </item>
+
+    <item
+        android:id="@+id/paste"
+        android:icon="@drawable/ic_content_paste"
+        app:showAsAction="always"
+        android:title="@string/paste">
+
+        <menu>
+            <item
+                android:id="@+id/paste_above"
+                android:icon="@drawable/cic_new_above"
+                android:title="@string/heads_action_menu_item_paste_above"/>
+
+            <item
+                android:id="@+id/paste_under"
+                android:icon="@drawable/cic_new_under"
+                android:title="@string/heads_action_menu_item_paste_under"/>
+
+            <item
+                android:id="@+id/paste_below"
+                android:icon="@drawable/cic_new_below"
+                android:title="@string/heads_action_menu_item_paste_below"/>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/move"
+        app:showAsAction="always"
+        android:icon="@drawable/ic_swap_vert"
+        android:title="@string/move">
+    </item>
+
+    <item
+        android:id="@+id/clock"
+        android:icon="@drawable/ic_hourglass_empty"
+        app:showAsAction="never"
+        android:title="@string/clock">
+        <menu>
+            <item
+                android:id="@+id/clock_in"
+                android:icon="@drawable/ic_hourglass_top"
+                android:title="@string/clock_in" />
+
+            <item
+                android:id="@+id/clock_out"
+                android:icon="@drawable/ic_hourglass_bottom"
+                android:title="@string/clock_out" />
+
+            <item
+                android:id="@+id/clock_cancel"
+                android:icon="@drawable/ic_hourglass_disabled"
+                android:title="@string/clock_cancel" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/share"
+        app:showAsAction="never"
+        android:icon="@drawable/ic_share"
+        android:title="@string/share">
+
+        <menu>
+            <item
+                android:id="@+id/share_note"
+                android:icon="@drawable/ic_notes"
+                android:title="@string/share_note"/>
+
+            <item
+                android:id="@+id/share_title"
+                android:icon="@drawable/ic_title"
+                android:title="@string/share_title"/>
+
+            <item
+                android:id="@+id/share_content"
+                android:icon="@drawable/ic_article"
+                android:title="@string/share_content"/>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/ai_decompose"
+        android:icon="@drawable/ic_help_outline"
+        app:showAsAction="never"
+        android:title="@string/ai_decompose"/>
+
+    <item
+        android:id="@+id/ai_polish"
+        android:icon="@drawable/ic_article"
+        app:showAsAction="never"
+        android:title="@string/ai_polish"/>
+
+    <item
+        android:id="@+id/delete_note"
+        app:showAsAction="never"
+        android:title="@string/delete"/>
+</menu>

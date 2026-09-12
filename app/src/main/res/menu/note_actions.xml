@@ -1,0 +1,121 @@
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="AlwaysShowAction">
+
+    <item
+        android:id="@+id/done"
+        android:title="@string/done"
+        android:icon="@drawable/ic_done"
+        app:showAsAction="always" />
+
+    <item
+        android:id="@+id/insert_inline_timestamp"
+        android:title="@string/insert_timestamp"
+        android:icon="@drawable/ic_today"
+        android:visible="false"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/clock"
+        android:icon="@drawable/ic_hourglass_empty"
+        app:showAsAction="never"
+        android:title="@string/clock">
+        <menu>
+            <item
+                android:id="@+id/clock_in"
+                android:icon="@drawable/ic_hourglass_top"
+                android:title="@string/clock_in" />
+
+            <item
+                android:id="@+id/clock_out"
+                android:icon="@drawable/ic_hourglass_bottom"
+                android:title="@string/clock_out" />
+
+            <item
+                android:id="@+id/clock_cancel"
+                android:icon="@drawable/ic_hourglass_disabled"
+                android:title="@string/clock_cancel" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/metadata"
+        android:icon="@drawable/ic_info_outline"
+        app:showAsAction="never"
+        android:title="@string/metadata">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/metadata_show_all"
+                    android:title="@string/show_all" />
+                <item
+                    android:id="@+id/metadata_show_selected"
+                    android:title="@string/show_selected" />
+            </group>
+
+            <item
+                android:id="@+id/metadata_always_show_set"
+                android:title="@string/always_show_set"
+                android:checkable="true" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/keep_screen_on"
+        app:showAsAction="never"
+        android:checkable="true"
+        android:title="@string/keep_screen_on"/>
+
+    <item
+        android:id="@+id/delete"
+        android:icon="@drawable/ic_delete"
+        app:showAsAction="never"
+        android:title="@string/delete" />
+
+    <item
+        android:id="@+id/share"
+        android:icon="@drawable/ic_share"
+        app:showAsAction="never"
+        android:title="@string/share">
+
+        <menu>
+            <item
+                android:id="@+id/share_note"
+                android:icon="@drawable/ic_notes"
+                android:title="@string/share_note"/>
+
+            <item
+                android:id="@+id/share_title"
+                android:icon="@drawable/ic_title"
+                android:title="@string/share_title"/>
+
+            <item
+                android:id="@+id/share_content"
+                android:icon="@drawable/ic_article"
+                android:title="@string/share_content"/>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/export_to_calendar"
+        android:icon="@drawable/ic_today"
+        app:showAsAction="never"
+        android:title="@string/export_to_calendar" />
+
+    <item
+        android:id="@+id/sync"
+        app:showAsAction="never"
+        android:title="@string/sync"/>
+
+    <item
+        android:id="@+id/activity_action_settings"
+        app:showAsAction="never"
+        android:title="@string/settings"/>
+
+    <item
+        android:id="@+id/sort_note"
+        app:showAsAction="never"
+        android:title="@string/sortnote"/>
+</menu>

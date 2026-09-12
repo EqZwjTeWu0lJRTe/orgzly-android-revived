@@ -1,0 +1,262 @@
+package com.orgzly.android.ui.dialogs
+
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import com.orgzly.android.ui.CommonViewModel
+import com.orgzly.android.ui.TimeType
+import com.orgzly.org.datetime.OrgDateTime
+import com.orgzly.org.datetime.OrgDelay
+import com.orgzly.org.datetime.OrgInterval
+import com.orgzly.org.datetime.OrgRepeater
+import java.util.Calendar
+import java.util.TimeZone
+
+
+class TimestampDialogViewModel(val timeType: TimeType, orgDateTime: String?) : CommonViewModel() {
+
+    data class DateTime(
+        val year: Int,
+        val month: Int,
+        val day: Int,
+        val isTimeUsed: Boolean,
+        val hour: Int,
+        val minute: Int,
+        val isEndTimeUsed: Boolean,
+        val endHour: Int,
+        val endMinute: Int,
+        val isRepeaterUsed: Boolean,
+        val repeater: OrgRepeater,
+        val isDelayUsed: Boolean,
+        val delay: OrgDelay,
+        val isActive: Boolean) {
+
+        companion object {
+            fun getInstance(str: String?): DateTime {
+                val orgDateTime = OrgDateTime.parseOrNull(str)
+
+                // TODO: Make default configurable
+                val defaultTime = Calendar.getInstance()
+
+                val cal = if (orgDateTime != null) {
+                    orgDateTime.calendar
+                } else {
+                    defaultTime
+                }
+
+                val year = cal.get(Calendar.YEAR)
+                val month = cal.get(Calendar.MONTH)
+                val day = cal.get(Calendar.DAY_OF_MONTH)
+
+                // If there is no time part, use default
+                val isTimeUsed = orgDateTime?.hasTime() ?: false
+                val hour: Int
+                val minute: Int
+                if (orgDateTime != null && !orgDateTime.hasTime()) {
+                    hour = defaultTime.get(Calendar.HOUR_OF_DAY)
+                    minute = defaultTime.get(Calendar.MINUTE)
+                } else {
+                    hour = cal.get(Calendar.HOUR_OF_DAY)
+                    minute = cal.get(Calendar.MINUTE)
+                }
+
+                val isEndTimeUsed = orgDateTime?.hasEndTime() ?: false
+                val endHour = orgDateTime?.endCalendar?.get(Calendar.HOUR_OF_DAY)
+                    ?: defaultTime.get(Calendar.HOUR_OF_DAY)
+                val endMinute = orgDateTime?.endCalendar?.get(Calendar.MINUTE)
+                    ?: defaultTime.get(Calendar.MINUTE)
+
+                val isDelayUsed = orgDateTime?.hasDelay() ?: false
+                val delay = orgDateTime?.delay ?: DEFAULT_DELAY
+
+                val isRepeaterUsed = orgDateTime?.hasRepeater() ?: false
+                val repeater = orgDateTime?.repeater ?: DEFAULT_REPEATER
+
+                val isActive = orgDateTime?.isActive ?: true
+
+                return DateTime(
+                    year,
+                    month,
+                    day,
+                    isTimeUsed,
+                    hour,
+                    minute,
+                    isEndTimeUsed,
+                    endHour,
+                    endMinute,
+                    isRepeaterUsed,
+                    repeater,
+                    isDelayUsed,
+                    delay,
+                    isActive
+                )
+            }
+        }
+    }
+
+    private val dateTimeMutable = MutableLiveData(DateTime.getInstance(orgDateTime))
+
+    val dateTime: LiveData<DateTime>
+        get() = dateTimeMutable
+
+
+    fun getDateInUtcMs(): Long? {
+        val localCal = getOrgDateTime()?.calendar ?: return null
+
+        val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+
+            set(
+                localCal.get(Calendar.YEAR),
+                localCal.get(Calendar.MONTH),
+                localCal.get(Calendar.DATE),
+                0,
+                0,
+                0)
+        }
+
+        return utcCal.timeInMillis
+    }
+
+    fun getYearMonthDay(): Triple<Int, Int, Int> {
+        val value = dateTimeMutable.value
+
+        return if (value != null) {
+            Triple(value.year, value.month, value.day)
+        } else {
+            defaultDate()
+        }
+    }
+
+    fun getTimeHourMinute(): Pair<Int, Int> {
+        val value = dateTimeMutable.value
+
+        return if (value != null) {
+            Pair(value.hour, value.minute)
+        } else {
+            defaultTime()
+        }
+    }
+
+    fun getEndTimeHourMinute(): Pair<Int, Int> {
+        val value = dateTimeMutable.value
+
+        return if (value != null) {
+            Pair(value.endHour, value.endMinute)
+        } else {
+            defaultTime()
+        }
+    }
+
+    fun getRepeaterString(): String {
+        return (dateTimeMutable.value?.repeater ?: DEFAULT_REPEATER).toString()
+    }
+
+    fun getDelayString(): String {
+        return (dateTimeMutable.value?.delay ?: DEFAULT_DELAY).toString()
+    }
+
+    fun getOrgDateTime(): OrgDateTime? {
+        return dateTimeMutable.value?.let {
+            getOrgDateTime(it)
+        }
+    }
+
+    fun getOrgDateTime(dateTime: DateTime): OrgDateTime {
+        val builder = OrgDateTime.Builder()
+            .setIsActive(dateTime.isActive)
+
+            .setYear(dateTime.year)
+            .setMonth(dateTime.month)
+            .setDay(dateTime.day)
+
+            .setHasTime(dateTime.isTimeUsed)
+            .setHour(dateTime.hour)
+            .setMinute(dateTime.minute)
+
+            .setHasEndTime(dateTime.isEndTimeUsed)
+            .setEndHour(dateTime.endHour)
+            .setEndMinute(dateTime.endMinute)
+
+            .setRepeater(if (dateTime.isRepeaterUsed) dateTime.repeater else null)
+            .setDelay(if (dateTime.isDelayUsed) dateTime.delay else null)
+
+        return builder.build()
+    }
+
+    fun set(year: Int, month: Int, day: Int) {
+        val value = dateTimeMutable.value ?: DateTime.getInstance(null)
+        dateTimeMutable.postValue(value.copy(year = year, month = month, day = day))
+    }
+
+    fun setTime(hour: Int, minute: Int) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isTimeUsed = true, hour = hour, minute = minute))
+        }
+    }
+
+    fun setEndTime(hour: Int, minute: Int) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isEndTimeUsed = true, endHour= hour, endMinute = minute))
+        }
+    }
+
+    fun set(repeater: OrgRepeater) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isRepeaterUsed = true, repeater = repeater))
+        }
+    }
+
+    fun set(delay: OrgDelay) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isDelayUsed = true, delay = delay))
+        }
+    }
+
+    fun setIsTimeUsed(isChecked: Boolean) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isTimeUsed = isChecked))
+        }
+    }
+
+    fun setIsEndTimeUsed(isChecked: Boolean) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isEndTimeUsed = isChecked))
+        }
+    }
+
+    fun setIsRepeaterUsed(isChecked: Boolean) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isRepeaterUsed = isChecked))
+        }
+    }
+
+    fun setIsDelayUsed(isChecked: Boolean) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isDelayUsed = isChecked))
+        }
+    }
+
+    fun setIsActive(isChecked: Boolean) {
+        dateTimeMutable.value?.let { value ->
+            dateTimeMutable.postValue(value.copy(isActive = isChecked))
+        }
+    }
+
+    private fun defaultDate() = Calendar.getInstance().let { cal ->
+        Triple(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
+    }
+
+    private fun defaultTime() = Calendar.getInstance().let { cal ->
+        Pair(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE))
+    }
+
+    companion object {
+        private val TAG = TimestampDialogViewModel::class.java.name
+
+        private val DEFAULT_REPEATER = OrgRepeater(
+            OrgRepeater.Type.RESTART, 1, OrgInterval.Unit.WEEK)
+
+        private val DEFAULT_DELAY = OrgDelay(
+            OrgDelay.Type.ALL, 1, OrgInterval.Unit.DAY)
+    }
+}

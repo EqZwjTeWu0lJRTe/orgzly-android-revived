@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <!-- https://material.io/guidelines/style/color.html#color-color-palette -->
+
+    <color name="red_200">#EF9A9A</color>
+    <color name="red_900">#B71C1C</color>
+
+    <color name="green_200">#A5D6A7</color>
+    <color name="green_900">#1B5E20</color>
+
+    <color name="grey_100">#F5F5F5</color>
+    <color name="grey_200">#EEEEEE</color>
+    <color name="grey_300">#E0E0E0</color>
+    <color name="grey_400">#BDBDBD</color>
+    <color name="grey_700">#616161</color>
+    <color name="grey_800">#424242</color>
+    <color name="grey_900">#212121</color>
+
+    <color name="blue_grey_200">#B0BEC5</color>
+    <color name="blue_grey_300">#90A4AE</color>
+    <color name="blue_grey_500">#607D8B</color>
+    <color name="blue_grey_600">#546E7A</color>
+    <color name="blue_grey_700">#455A64</color>
+
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- http://www.google.com/design/spec/style/color.html#color-themes -->
+
+    <color name="dark_theme_app_bar">#292929</color>
+    <color name="dark_theme_cards_and_dialogs">#242424</color>
+
+    <!-- https://material.io/guidelines/style/color.html#color-usability -->
+
+    <color name="dark_text_primary_color">#DE000000</color> <!-- 87% -->
+    <color name="dark_text_secondary_color">#8A000000</color> <!-- 54% -->
+    <!-- 38% -->
+
+    <color name="white_text_primary_color">#FFFFFF</color> <!-- 100% -->
+    <color name="white_text_secondary_color">#B3FFFFFF</color> <!-- 70% -->
+    <!-- 50% -->
+
+    <color name="notification">@color/blue_grey_700</color>
+
+    <color name="widget_light_header_bg_color">#EEF2FF</color>
+    <color name="widget_light_header_text_color">#1E293B</color>
+    <color name="widget_light_list_bg_color">#F8FAFC</color>    <color name="widget_light_state_todo_color">@color/red_900</color>
+    <color name="widget_light_state_done_color">@color/green_900</color>
+    <color name="widget_light_title_color">@color/dark_text_primary_color</color>
+    <color name="widget_light_post_title_color">@color/dark_text_secondary_color</color>
+
+    <color name="widget_dark_header_bg_color">@color/dark_theme_app_bar</color>
+    <color name="widget_dark_header_text_color">@color/white_text_primary_color</color>
+    <color name="widget_dark_list_bg_color">@color/dark_theme_cards_and_dialogs</color>
+    <color name="widget_dark_state_todo_color">@color/red_200</color>
+    <color name="widget_dark_state_done_color">@color/green_200</color>
+    <color name="widget_dark_title_color">@color/white_text_primary_color</color>
+    <color name="widget_dark_post_title_color">@color/white_text_secondary_color</color>
+
+    <color name="widget_black_header_bg_color">@color/black</color>
+    <color name="widget_black_header_text_color">@color/white_text_primary_color</color>
+    <color name="widget_black_list_bg_color">@color/black</color>
+    <color name="widget_black_state_todo_color">@color/red_200</color>
+    <color name="widget_black_state_done_color">@color/green_200</color>
+    <color name="widget_black_title_color">@color/white_text_primary_color</color>
+    <color name="widget_black_post_title_color">@color/white_text_secondary_color</color>
+
+    <color name="dropbox_blue">#007ee5</color>
+
+    <!-- Widget page (behind the rounded cards) backgrounds -->
+    <color name="widget_light_page_bg_color">#ECEFF1</color>
+    <color name="widget_dark_page_bg_color">#141519</color>
+    <color name="widget_black_card_bg_color">#232327</color>
+</resources>
+

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/developer_options">
+
+    <SwitchPreference
+        android:key="@string/pref_key_git_is_enabled"
+        android:title="@string/git_repository_type"
+        android:summary="@string/in_development"
+        android:defaultValue="@bool/pref_default_git_is_enabled" />
+
+    <SwitchPreference
+        android:key="@string/pref_key_log_major_events"
+        android:title="@string/log_major_events"
+        android:defaultValue="@bool/pref_default_log_major_events" />
+
+    <Preference
+        android:key="@string/pref_key_major_events_logs"
+        android:dependency="@string/pref_key_log_major_events"
+        android:title="@string/logs">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="@string/application_id"
+            android:targetClass="com.orgzly.android.ui.logs.AppLogsActivity"/>
+    </Preference>
+
+    <Preference
+        android:key="pref_key_git_commit"
+        android:title="Git commit of app build"
+        app:enableCopying="true" />
+
+</androidx.preference.PreferenceScreen>

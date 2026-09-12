@@ -1,0 +1,60 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <dimen name="item_head_book_name_width">80dp</dimen>
+
+    <dimen name="item_head_padding_comfortable">7dp</dimen>
+    <dimen name="item_head_padding_cozy">3dp</dimen>
+    <dimen name="item_head_padding_compact">0dp</dimen>
+
+    <dimen name="item_head_below_title_padding_comfortable">5dp</dimen>
+    <dimen name="item_head_below_title_padding_cozy">3dp</dimen>
+    <dimen name="item_head_below_title_padding_compact">0dp</dimen>
+
+    <dimen name="dropdown_item_height">48dp</dimen>
+    <dimen name="dropdown_item_min_width">96dp</dimen>
+
+    <dimen name="item_book_padding">12dp</dimen>
+
+    <!-- Reasoning - "Spacing between each UI element is 8dp."
+         (http://developer.android.com/design/style/metrics-grids.html) -->
+
+    <dimen name="padding_bottom_for_fab">104dp</dimen>
+
+    <!-- Padding for sync button -->
+
+    <dimen name="bullet_inner_size">8dp</dimen>
+    <dimen name="bullet_inner_inset">4dp</dimen>
+    <dimen name="bullet_total_size">16dp</dimen>
+
+    <dimen name="screen_edge">16dp</dimen>
+
+    <dimen name="space_between_content_areas">8dp</dimen>
+
+    <dimen name="fragment_note_icon_margin">24dp</dimen>
+
+    <dimen name="widget_title_text_size_14">15sp</dimen>
+    <dimen name="widget_post_title_text_size_14">11.5sp</dimen>
+    <dimen name="widget_header_text_size_14">17sp</dimen>
+
+    <dimen name="widget_title_text_size_16">16sp</dimen>
+    <dimen name="widget_post_title_text_size_16">14sp</dimen>
+    <dimen name="widget_header_text_size_16">17sp</dimen>
+
+    <dimen name="widget_metadata_icon_alpha">0.87</dimen>
+    <dimen name="color_swatch_size">48dp</dimen>
+
+    <dimen name="widget_padding">2dp</dimen>
+
+    <dimen name="bullet_margin">8dp</dimen>
+
+    <dimen name="fragment_query_bottom_padding">88dp</dimen>
+
+    <!-- Duration of animation for opening, closing and switching a quick bar -->
+    <integer name="quick_bar_animation_duration">150</integer>
+
+    <!-- Height of the quick bar when fully opened -->
+    <dimen name="quick_bar_height">48dp</dimen>
+
+    <dimen name="fold_button_width">48dp</dimen>
+
+    <dimen name="fab_stack_spacing">80dp</dimen>
+</resources>

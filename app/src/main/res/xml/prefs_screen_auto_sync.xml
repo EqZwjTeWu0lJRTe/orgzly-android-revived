@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/auto_sync">
+
+    <Preference
+        android:selectable="false"
+        android:icon="@drawable/ic_warning"
+        android:summary="@string/auto_sync_warning"/>
+
+    <!-- Independent of the auto-sync master switch: syncs once whenever the app is opened. -->
+    <SwitchPreference
+        android:key="@string/pref_key_sync_on_app_open"
+        android:title="@string/pref_title_sync_on_app_open"
+        android:summary="@string/pref_summary_sync_on_app_open"
+        android:defaultValue="@bool/pref_default_sync_on_app_open"/>
+
+    <!-- Independent of the auto-sync master switch: sync after every edit inside Orgzly. -->
+    <SwitchPreference
+        android:key="@string/pref_key_sync_on_note_change"
+        android:title="@string/pref_title_sync_on_note_change"
+        android:summary="@string/pref_summary_sync_on_note_change"
+        android:defaultValue="@bool/pref_default_sync_on_note_change"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync"
+        android:title="@string/auto_sync"
+        android:defaultValue="@bool/pref_default_auto_sync"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync_on_note_create"
+        android:dependency="@string/pref_key_auto_sync"
+        android:title="@string/pref_title_sync_after_note_create"
+        android:summary="@string/pref_summary_sync_after_note_create"
+        android:defaultValue="@bool/pref_default_auto_sync_on_note_create"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync_on_note_update"
+        android:dependency="@string/pref_key_auto_sync"
+        android:title="@string/pref_title_sync_after_note_update"
+        android:summary="@string/pref_summary_sync_after_note_update"
+        android:defaultValue="@bool/pref_default_auto_sync_on_note_update"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync_on_resume"
+        android:dependency="@string/pref_key_auto_sync"
+        android:title="@string/pref_title_on_resume_sync"
+        android:summary="@string/pref_summary_on_resume_sync"
+        android:defaultValue="@bool/pref_default_auto_sync_on_resume"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync_on_suspend"
+        android:dependency="@string/pref_key_auto_sync"
+        android:title="@string/pref_title_on_suspend_sync"
+        android:summary="@string/pref_summary_on_suspend_sync"
+        android:defaultValue="@bool/pref_default_auto_sync_on_suspend"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync_at_interval_enabled"
+        android:dependency="@string/pref_key_auto_sync"
+        android:title="@string/pref_title_sync_at_interval"
+        android:summary="@string/pref_summary_sync_at_interval"
+        android:defaultValue="@bool/pref_default_auto_sync_at_interval_enabled"/>
+
+    <com.orgzly.android.prefs.IntegerPreference
+        android:key="@string/pref_key_auto_sync_interval_in_mins"
+        android:dependency="@string/pref_key_auto_sync_at_interval_enabled"
+        android:title="@string/pref_key_auto_sync_interval_title"
+        android:selectAllOnFocus="true"
+        android:inputType="number"
+        android:defaultValue="@string/pref_default_auto_sync_interval_in_mins"
+        app:min="@string/pref_key_auto_sync_interval_minimum_value" />
+
+    <SwitchPreference
+        android:key="@string/pref_key_auto_sync_on_repo_change"
+        android:enabled="false"
+        android:title="@string/pref_title_repo_update_sync"
+        android:summary="@string/pref_summary_repo_update_sync"
+        android:defaultValue="@bool/pref_default_auto_sync_on_repo_change"/>
+</androidx.preference.PreferenceScreen>

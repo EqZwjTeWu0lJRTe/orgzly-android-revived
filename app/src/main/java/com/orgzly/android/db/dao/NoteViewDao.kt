@@ -1,0 +1,266 @@
+package com.orgzly.android.db.dao
+
+import androidx.lifecycle.LiveData
+import androidx.room.Dao
+import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
+import com.orgzly.android.db.entity.Book
+import com.orgzly.android.db.entity.Note
+import com.orgzly.android.db.entity.NoteProperty
+import com.orgzly.android.db.entity.NoteView
+import kotlinx.coroutines.flow.Flow
+import org.intellij.lang.annotations.Language
+
+@Dao
+abstract class NoteViewDao {
+    @Query("$QUERY WHERE notes.level > 0 GROUP BY notes.id")
+    abstract fun getAll(): List<NoteView>
+
+    @Query("""
+        $QUERY
+        WHERE notes.book_id = :bookId
+        AND notes.level > 0
+        AND notes.is_cut = 0
+        AND notes.folded_under_id = 0
+        GROUP BY notes.id
+        ORDER BY notes.lft
+    """)
+    abstract fun getVisibleLiveData(bookId: Long): LiveData<List<NoteView>>
+
+    @Query("""
+        $QUERY
+        WHERE notes.book_id = :bookId
+        AND notes.level > 0
+        AND notes.is_cut = 0
+        AND notes.folded_under_id = 0
+        AND :lft <= notes.lft
+        AND notes.rgt <= :rgt
+        GROUP BY notes.id
+        ORDER BY notes.lft
+    """)
+    abstract fun getVisibleLiveData(bookId: Long, lft: Long, rgt: Long): LiveData<List<NoteView>>
+
+    /**
+     * Get visible notes narrowed to a specific note's subtree.
+     * Uses a subquery to dynamically get the current lft/rgt bounds.
+     */
+    @Query("""
+        $QUERY
+        WHERE notes.book_id = :bookId
+        AND notes.level > 0
+        AND notes.is_cut = 0
+        AND notes.folded_under_id = 0
+        AND (SELECT lft FROM notes WHERE id = :narrowedNoteId) <= notes.lft
+        AND notes.rgt <= (SELECT rgt FROM notes WHERE id = :narrowedNoteId)
+        GROUP BY notes.id
+        ORDER BY notes.lft
+    """)
+    abstract fun getVisibleLiveDataNarrowed(bookId: Long, narrowedNoteId: Long): LiveData<List<NoteView>>
+
+    @RawQuery(observedEntities = [ Note::class, NoteProperty::class, Book::class ])
+    abstract fun runQueryFlow(query: SupportSQLiteQuery): Flow<List<NoteView>>
+
+    @RawQuery(observedEntities = [ Note::class, NoteProperty::class, Book::class ])
+    abstract fun runQuery(query: SupportSQLiteQuery): List<NoteView>
+
+    @Query("$QUERY WHERE notes.id = :id GROUP BY notes.id")
+    abstract fun get(id: Long): NoteView?
+
+    @Query("$QUERY WHERE (notes.scheduled_range_id IS NOT NULL OR notes.deadline_range_id IS NOT NULL) AND notes.level > 0 GROUP BY notes.id")
+    abstract fun getAllWithScheduledOrDeadline(): List<NoteView>
+
+    @Query("$QUERY WHERE notes.title = :title GROUP BY notes.id ORDER BY lft DESC LIMIT 1")
+    abstract fun getLast(title: String): NoteView?
+
+    @Query("$QUERY WHERE book_name = :bookName AND notes.level > 0 AND notes.is_cut = 0 GROUP BY notes.id ORDER BY notes.lft")
+    abstract fun getBookNotes(bookName: String): List<NoteView>
+
+    @Query("""
+        $QUERY
+        WHERE notes.level > 0 AND notes.is_cut = 0
+        AND date(deadline_time_start_of_day) = date('now', 'localtime')
+        GROUP BY notes.id ORDER BY deadline_time_timestamp
+    """)
+    abstract fun getDeadlineToday(): List<NoteView>
+
+    @Query("""
+        $QUERY
+        WHERE notes.level > 0 AND notes.is_cut = 0
+        AND date(scheduled_time_start_of_day) = date('now', 'localtime')
+        GROUP BY notes.id ORDER BY scheduled_time_timestamp
+    """)
+    abstract fun getScheduledToday(): List<NoteView>
+
+    @Query("""
+        $QUERY
+        WHERE notes.level > 0 AND notes.is_cut = 0
+        AND deadline_time_timestamp IS NOT NULL
+        AND deadline_time_timestamp < :startOfToday
+        GROUP BY notes.id ORDER BY deadline_time_timestamp
+    """)
+    abstract fun getDeadlineOverdue(startOfToday: Long): List<NoteView>
+
+    @Query("""
+        $QUERY
+        WHERE notes.level > 0 AND notes.is_cut = 0
+        AND scheduled_time_timestamp IS NOT NULL
+        AND scheduled_time_timestamp < :startOfToday
+        GROUP BY notes.id ORDER BY scheduled_time_timestamp
+    """)
+    abstract fun getScheduledOverdue(startOfToday: Long): List<NoteView>
+
+    @Query("""
+        $QUERY
+        WHERE notes.level > 0 AND notes.is_cut = 0
+        AND notes.state IS NOT NULL
+        AND notes.scheduled_range_id IS NULL
+        AND notes.deadline_range_id IS NULL
+        GROUP BY notes.id ORDER BY notes.lft
+    """)
+    abstract fun getUntimedTasks(): List<NoteView>
+
+
+    companion object {
+        @Language("RoomSql")
+        const val QUERY = """
+            SELECT
+
+            notes.*,
+
+            -- MAX() is required by SQLite's GROUP BY syntax. Since each note belongs
+            -- to exactly one book, all grouped rows have identical filetags values,
+            -- so MAX() effectively just returns that single value.
+            TRIM(COALESCE(MAX(t_books.filetags) || ' ', '') || COALESCE(group_concat(t_notes_with_inherited_tags.tags, ' '), '')) AS inherited_tags,
+
+            t_scheduled_range.string AS scheduled_range_string,
+            t_scheduled_timestamps_start.string AS scheduled_time_string,
+            t_scheduled_timestamps_end.string AS scheduled_time_end_string,
+            t_scheduled_timestamps_start.timestamp AS scheduled_time_timestamp,
+            datetime(t_scheduled_timestamps_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS scheduled_time_start_of_day,
+            t_scheduled_timestamps_start.hour AS scheduled_time_hour,
+
+            t_deadline_range.string AS deadline_range_string,
+            t_deadline_timestamps_start.string AS deadline_time_string,
+            t_deadline_timestamps_end.string AS deadline_time_end_string,
+            t_deadline_timestamps_start.timestamp AS deadline_time_timestamp,
+            datetime(t_deadline_timestamps_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS deadline_time_start_of_day,
+            t_deadline_timestamps_start.hour AS deadline_time_hour,
+
+            t_closed_range.string AS closed_range_string,
+            t_closed_timestamps_start.string AS closed_time_string,
+            t_closed_timestamps_end.string AS closed_time_end_string,
+            t_closed_timestamps_start.string AS closed_time_timestamp,
+            datetime(t_closed_timestamps_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS closed_time_start_of_day,
+            t_closed_timestamps_start.hour AS closed_time_hour,
+
+            t_clock_range.string AS clock_range_string,
+            t_clock_timestamps_start.string AS clock_time_string,
+            t_clock_timestamps_end.string AS clock_time_end_string,
+
+            NULL AS event_string,
+            NULL AS event_timestamp,
+            NULL AS event_end_timestamp,
+            NULL AS event_start_of_day,
+            NULL AS event_hour,
+
+            MAX((SELECT np.value FROM note_properties np WHERE np.note_id = notes.id AND LOWER(np.name) = 'clock_start' LIMIT 1)) AS clock_start,
+            MAX((SELECT np.value FROM note_properties np WHERE np.note_id = notes.id AND LOWER(np.name) = 'clocked_seconds' LIMIT 1)) AS clocked_seconds,
+
+            t_books.name AS book_name
+
+            FROM notes
+
+            LEFT JOIN org_ranges t_scheduled_range ON t_scheduled_range.id = notes.scheduled_range_id
+            LEFT JOIN org_timestamps t_scheduled_timestamps_start ON t_scheduled_timestamps_start.id = t_scheduled_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_scheduled_timestamps_end ON t_scheduled_timestamps_end.id = t_scheduled_range.end_timestamp_id
+            LEFT JOIN org_ranges t_deadline_range ON t_deadline_range.id = notes.deadline_range_id
+            LEFT JOIN org_timestamps t_deadline_timestamps_start ON t_deadline_timestamps_start.id = t_deadline_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_deadline_timestamps_end ON t_deadline_timestamps_end.id = t_deadline_range.end_timestamp_id
+            LEFT JOIN org_ranges t_closed_range ON t_closed_range.id = notes.closed_range_id
+            LEFT JOIN org_timestamps t_closed_timestamps_start ON t_closed_timestamps_start.id = t_closed_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_closed_timestamps_end ON t_closed_timestamps_end.id = t_closed_range.end_timestamp_id
+            LEFT JOIN org_ranges t_clock_range ON t_clock_range.id = notes.clock_range_id
+            LEFT JOIN org_timestamps t_clock_timestamps_start ON t_clock_timestamps_start.id = t_clock_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_clock_timestamps_end ON t_clock_timestamps_end.id = t_clock_range.end_timestamp_id
+            LEFT JOIN books t_books ON t_books.id = notes.book_id
+            LEFT JOIN note_ancestors t_note_ancestors ON t_note_ancestors.note_id = notes.id
+            LEFT JOIN notes t_notes_with_inherited_tags ON t_notes_with_inherited_tags.id = t_note_ancestors.ancestor_note_id
+        """
+
+        @Language("RoomSql")
+        const val QUERY_WITH_NOTE_EVENTS = """
+            SELECT
+
+            notes.*,
+
+            -- MAX() is required by SQLite's GROUP BY syntax. Since each note belongs
+            -- to exactly one book, all grouped rows have identical filetags values,
+            -- so MAX() effectively just returns that single value.
+            TRIM(COALESCE(MAX(t_books.filetags) || ' ', '') || COALESCE(group_concat(t_notes_with_inherited_tags.tags, ' '), '')) AS inherited_tags,
+
+            t_scheduled_range.string AS scheduled_range_string,
+            t_scheduled_timestamps_start.is_active AS scheduled_is_active,
+            t_scheduled_timestamps_start.string AS scheduled_time_string,
+            t_scheduled_timestamps_end.string AS scheduled_time_end_string,
+            t_scheduled_timestamps_start.timestamp AS scheduled_time_timestamp,
+            datetime(t_scheduled_timestamps_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS scheduled_time_start_of_day,
+            t_scheduled_timestamps_start.hour AS scheduled_time_hour,
+
+            t_deadline_range.string AS deadline_range_string,
+            t_deadline_timestamps_start.is_active AS deadline_is_active,
+            t_deadline_timestamps_start.string AS deadline_time_string,
+            t_deadline_timestamps_end.string AS deadline_time_end_string,
+            t_deadline_timestamps_start.timestamp AS deadline_time_timestamp,
+            datetime(t_deadline_timestamps_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS deadline_time_start_of_day,
+            t_deadline_timestamps_start.hour AS deadline_time_hour,
+
+            t_closed_range.string AS closed_range_string,
+            t_closed_timestamps_start.string AS closed_time_string,
+            t_closed_timestamps_end.string AS closed_time_end_string,
+            t_closed_timestamps_start.timestamp AS closed_time_timestamp,
+            datetime(t_closed_timestamps_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS closed_time_start_of_day,
+            t_closed_timestamps_start.hour AS closed_time_hour,
+
+            t_clock_range.string AS clock_range_string,
+            t_clock_timestamps_start.string AS clock_time_string,
+            t_clock_timestamps_end.string AS clock_time_end_string,
+
+            t_note_events_range.string AS event_string,
+            t_note_events_start.timestamp AS event_timestamp,
+            COALESCE(t_note_events_start.end_timestamp, t_note_events_end.timestamp, t_note_events_start.timestamp) AS event_end_timestamp,
+            datetime(t_note_events_start.timestamp/1000, 'unixepoch', 'localtime', 'start of day') AS event_start_of_day,
+            t_note_events_start.hour AS event_hour,
+
+            t_books.name AS book_name,
+
+            MAX((SELECT np.value FROM note_properties np WHERE np.note_id = notes.id AND LOWER(np.name) = 'clock_start' LIMIT 1)) AS clock_start,
+            MAX((SELECT np.value FROM note_properties np WHERE np.note_id = notes.id AND LOWER(np.name) = 'clocked_seconds' LIMIT 1)) AS clocked_seconds
+
+            FROM notes
+
+            LEFT JOIN org_ranges t_scheduled_range ON t_scheduled_range.id = notes.scheduled_range_id
+            LEFT JOIN org_timestamps t_scheduled_timestamps_start ON t_scheduled_timestamps_start.id = t_scheduled_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_scheduled_timestamps_end ON t_scheduled_timestamps_end.id = t_scheduled_range.end_timestamp_id
+            LEFT JOIN org_ranges t_deadline_range ON t_deadline_range.id = notes.deadline_range_id
+            LEFT JOIN org_timestamps t_deadline_timestamps_start ON t_deadline_timestamps_start.id = t_deadline_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_deadline_timestamps_end ON t_deadline_timestamps_end.id = t_deadline_range.end_timestamp_id
+            LEFT JOIN org_ranges t_closed_range ON t_closed_range.id = notes.closed_range_id
+            LEFT JOIN org_timestamps t_closed_timestamps_start ON t_closed_timestamps_start.id = t_closed_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_closed_timestamps_end ON t_closed_timestamps_end.id = t_closed_range.end_timestamp_id
+            LEFT JOIN org_ranges t_clock_range ON t_clock_range.id = notes.clock_range_id
+            LEFT JOIN org_timestamps t_clock_timestamps_start ON t_clock_timestamps_start.id = t_clock_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_clock_timestamps_end ON t_clock_timestamps_end.id = t_clock_range.end_timestamp_id
+            LEFT JOIN books t_books ON t_books.id = notes.book_id
+            LEFT JOIN note_ancestors t_note_ancestors ON t_note_ancestors.note_id = notes.id
+            LEFT JOIN notes t_notes_with_inherited_tags ON t_notes_with_inherited_tags.id = t_note_ancestors.ancestor_note_id
+
+            LEFT JOIN note_events t_note_events ON t_note_events.note_id = notes.id
+            LEFT JOIN org_ranges t_note_events_range ON t_note_events_range.id = t_note_events.org_range_id
+            LEFT JOIN org_timestamps t_note_events_start ON t_note_events_start.id = t_note_events_range.start_timestamp_id
+            LEFT JOIN org_timestamps t_note_events_end ON t_note_events_end.id = t_note_events_range.end_timestamp_id
+
+            GROUP BY notes.id, event_timestamp
+        """
+    }
+}

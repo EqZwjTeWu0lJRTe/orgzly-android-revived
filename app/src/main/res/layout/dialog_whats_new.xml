@@ -1,0 +1,1167 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:padding="@dimen/screen_edge"
+    android:scrollbarStyle="outsideOverlay">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/dialog_whats_new_intro"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.23.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add basic support for capture templates." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix cut notes behavior to eliminate risk of data loss." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Hide “Refine Search” button on saved search queries." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Save checkbox toggles immediately in single note view." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.22.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix bug when opening saved search from the widget." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Sharing note now uses on-screen content, instead of stored content." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add menu actions for sharing note title and content separately." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Don't add extra hour when inserting in-line timestamps." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.21.1"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Disallow external files access in the Google Play store build." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.21.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add new, simplified search UI." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Improve support for partially-checked checkboxes." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Various bug fixes." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.20.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support file tags." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Handle recurring events in exported calendar." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Handle multiple timestamps per note in exported calendar." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix timezone bug with all-day events in exported calendar." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Target Android API 36 (Android 16)." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.18.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow selecting a saved search for calendar export." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix calendar sync bugs." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.17.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Auto-complete property names." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Show overdue scheduled notes on the current day (can be reverted in settings)." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add “insert inline timestamp” button when editing notes." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support Android per-app language configuration." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.16.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Implement Android Calendar Provider integration." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Implement “narrowing” as a note swipe-action." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix divide-by-zero bug in statistics cookies." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.15.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add ability to share the contents of one or more notes." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.14.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add periodic auto-sync." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow disabling the creation of org links from shared web links." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix bug when receiving shared web links." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.13.1"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Handle “edge-to-edge” graphics on Android 15 and above." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.13.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Improve the “share to Orgzly” experience (setting added under “New note”)." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Target Android 15 (API 35)." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.12.1"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Include new note screen in “recent activities” stack." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.12.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Bug fix: Long notes (>5000 characters) are no longer cut off." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Bug fix: Fix broken pull-down-to-sync gesture in the notes view." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow folding note contents in search view." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add FAB for jumping to top of note, shown when scrolling." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow changing the .orgzlyignore file name." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Translation updates." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Dependency upgrades." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.11.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add FAB for jumping to bottom of note, shown when scrolling." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix bug preventing grabbing the scrollbar." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Ensure agenda items are sorted by minute." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Show meaningful heading when viewing a saved search." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update dependencies." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.10.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Always sort agenda items chronologically (&lt;a href=&quot;https://orgzlyrevived.com/docs#search-agenda&quot;&gt;documentation&lt;/a&gt;)." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix a modification time bug in the directory repository type." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.9.0"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow export/import of settings and saved searches to/from a chosen note. (See app settings.)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Start applying &lt;a href=&quot;https://semver.org/&quot;&gt;semantic versioning&lt;/a&gt; when naming app releases." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.38"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update title percentage/fraction cookies to reflect TODO and checkbox statistics." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.37"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Remove notification LED color setting due to a bug." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Dependency upgrades." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.36"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Parse properties in notebook “preface”." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow linking to notebooks by the “ID” property." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="New option to add a “ID” property to all new notes." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Automatically create org links when sharing URIs to Orgzly." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.35"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Improve handling of the “alarms &amp; reminders” special permission." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add option to let reminders play alarm sound." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.34"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.33"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Make notification LED color configurable." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade some dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.32"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add Belarusian, Lithuanian translations and update multiple languages." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix “sync in progress” notification not showing." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.31"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Downgrade a WebDAV dependency." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.30"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix &lt;a href=&quot;https://github.com/orgzly-revived/orgzly-android-revived/issues/395&quot;&gt;file corruption bug&lt;/a&gt; when saving to directory repos." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.29"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix crash when pasting notes." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Update translations for Brazilian Portuguese and Turkish." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Upgrade dependencies." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.28"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Target Android 14 and upgrade some Android dependencies." />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Dropbox: Account access is now full scope, not app folder. (Unlink and re-link for it to take effect.)" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.27"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add support for repository subfolders. (Note: The feature is disabled by default. It can be enabled under sync settings. In a future release, it will become enabled by default.)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Leverage timestamps in PROPERTIES drawers" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix race condition when deleting multiple notebooks" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.26"
+            tools:ignore="HardcodedText"
+            android:autoLink="web" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support &lt;a href=&quot;https://www.orgzlyrevived.com/docs#orgc553add&quot;&gt;the .orgzlyignore file&lt;/a&gt; in all repo types" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.25"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix broken image linking on Android 13 and above" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support selecting multiple notebooks" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.24"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Better handling of remotely deleted files" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Better handling of the notifications permission" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.23"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix crash when scheduling reminders" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Git repos: Fix broken .orgzlyignore rule check" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.22"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Prompt user to grant permission for alarms, notifications" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Temporarily disable Git repos in Play Store build" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Enable sync failure notifications by default" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Target Android 13" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Git repos: Lower the garbage collection threshold" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.21"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix F-Droid build not being reproducible" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.20"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix broken Dropbox account linking" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.19"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Git: Check .orgzlyignore when writing files" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.18"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support syncing to empty Git repository" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.17"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Various fixes for Git repos" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix broken app shortcuts" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.16"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Prevent adding undesired newline between drawers in header" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.15"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Log sync events to major events app log" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Removed forced Light theme for splash screen" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Turkish translation updated" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Disable Git repos below API 24" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add a public receiver for Tasker, Automate, etc." />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.14"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Git: Work around bug in the SSH transport library" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.13"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Git: Show current branch in notebook sync status" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Eliminate jitter in widget agenda" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Bug fixes around SSH key generation and Git cloning" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix broken notification settings" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Log more about Git-related errors" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.12"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add preference to hide empty days in agenda" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Show ranged timestamps in agenda queries" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Consider time and date ranges when querying events" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add menu option to sort lines in a note" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add preference to trigger auto-sync upon suspend" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add tooltips to popup buttons" />
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.11"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add sync button to widget" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add clocking/time capture feature" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add support for opening org-protocol://org-id-goto links" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Make popup buttons configurable" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Generate SSH key for Git syncing on the device" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Various Git-related improvements (feature still in beta)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add monochrome icon definition" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.10"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow using alarm clock for scheduling reminders with a time of day" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Log and view major events (e.g. scheduling reminders)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Check for reminders since the last run on boot and data-change" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Remove edit/view modes from note, single tap to edit and position the cursor correctly" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Replace quick menus with popup windows" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.9"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Dynamic color scheme" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix starting sync from the background (e.g. auto-sync or ActionReceiver)" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.8"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix slow sync and app start due to shortcuts refreshing" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Stop using alarm clock for reminders" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add Sync back to the overflow menu" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix a graphics glitch with a transparent navigation bar on Android 8.1" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Stop hiding the top of the content under the toolbar on the keyboard open" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.7"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Target Android 12L" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Scroll to the top on action bar click" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Use Material 3" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Use larger agenda dividers with a background color" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Render images, allow using monospaced font and register checkbox changes for notebook preface" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix the permission issue when creating a “New note” widget" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.6"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Target Android 11" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="New “System” color scheme" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="WebDAV sync fixes and digest authentication support" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.5"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support &lt;tt&gt;.tn&lt;/tt&gt; search operator" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Preference to insert new note at the beginning of notebook" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Preference to define root directory for file links" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Gray out notes with &lt;tt&gt;ARCHIVE&lt;/tt&gt; tag" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support &lt;tt&gt;+&lt;/tt&gt; as a bullet for lists" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support “Keep screen on” option in note view" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Allow picking directory for saved searches export" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix list continuing on some keyboards" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Handle escaped brackets in links" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Few fixes for timestamps without time part set (fix for &lt;tt&gt;s.now&lt;/tt&gt; and reminders)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Ignore inactive scheduled and deadline times in agenda" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.4"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Sticky agenda headers" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Preference for time for daily reminders" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Button to open tags dropdown menu" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Preview title in note view" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Switch for changing note's view/edit mode" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Enter edit mode on title or content click in note view" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Remove share activity from recent apps" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Maximize height of clickable area for the folding button" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Remember location in refile dialog" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Swipe down to sync in search results" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Enable reminders by default" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix broken notebook shortcuts" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix parsing of link with square brackets in its name" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix PROPERTY line parsing" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Use local-specific time format everywhere" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.3"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Overdue section in agenda" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="UI for end-time and delay/warning period" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Paste button in notebook for when it's empty" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Start new plain list item on enter press while editing content" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix issue of hidden notes when &lt;tt&gt;o.e&lt;/tt&gt; is used" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix issue when pasting a large number of notes" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix subtree unfolding (long-click)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Do not cancel sync on pull-to-sync" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Add labels and make buttons obvious in timestamp dialog" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Underline breadcrumb links" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Do not fold other notes on refile's go-to action" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.2"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Support adding trusted certificates for WebDAV repo" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix issue causing crash on start related to deleted repositories in the past" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Display number of notes to be deleted in confirmation dialog" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8.1"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Enable auto-sync for WebDAV" />
+
+
+        <TextView
+            style="@style/WhatsNewVersion"
+            android:text="v1.8"
+            tools:ignore="HardcodedText" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="WebDAV repository support" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Swipe down to sync (notebooks and notebook views)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Sort by title (&lt;tt&gt;o.title&lt;/tt&gt;)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Set Dropbox token by long-clicking the link button" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Scroll to top when editing title (to keep breadcrumbs visible)" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix displaying of remote notebook's modification time in notebook details" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Do not display confirmation dialog when new note is not modified" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Fix metadata visibility issue on initial note loading" />
+
+        <com.orgzly.android.ui.views.WhatsNewChange
+            style="@style/WhatsNewChange"
+            app:text="Display all note's events in agenda" />
+
+
+        <!-- It's Nov 02 2022, and I'm on line 384. Too many changes above? -->
+        <TextView
+            android:id="@+id/dialog_whats_new_outro"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp" />
+
+    </LinearLayout>
+</ScrollView>

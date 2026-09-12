@@ -1,0 +1,23 @@
+<resources>
+
+    <!--
+         Customize dimensions originally defined in res/values/dimens.xml (such as
+         screen margins) for sw600dp devices (e.g. 7" tablets) here.
+    -->
+
+    <dimen name="item_head_book_name_width">120dp</dimen>
+
+    <dimen name="widget_padding">4dp</dimen>
+
+    <dimen name="fold_button_width">60dp</dimen>
+
+    <!--
+    Layout alias to replace the single-pane version of the layout with a
+    two-pane version on Large screens.
+
+    For more on layout aliases, see:
+    http://developer.android.com/training/multiscreen/screensizes.html#TaskUseAliasFilters
+    -->
+    <!--<item type="layout" name="headings_activity">@layout/activity_twopane</item>-->
+
+</resources>

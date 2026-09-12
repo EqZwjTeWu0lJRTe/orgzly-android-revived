@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/look_and_feel">
+
+    <PreferenceCategory android:title="@string/color_scheme">
+        <ListPreference
+            android:key="@string/pref_key_color_theme"
+            android:title="@string/theme"
+            android:entries="@array/color_theme"
+            android:entryValues="@array/color_theme_values"
+            android:defaultValue="@string/pref_default_color_theme"
+            app:useSimpleSummaryProvider="true"/>
+
+        <ListPreference
+            android:key="@string/pref_key_light_color_scheme"
+            android:title="@string/light_scheme"
+            android:entries="@array/light_color_scheme_list"
+            android:entryValues="@array/light_color_scheme_list_values"
+            android:defaultValue="@string/pref_default_light_color_scheme"
+            app:useSimpleSummaryProvider="true"/>
+
+        <ListPreference
+            android:key="@string/pref_key_dark_color_scheme"
+            android:title="@string/dark_scheme"
+            android:entries="@array/dark_color_scheme_list"
+            android:entryValues="@array/dark_color_scheme_list_values"
+            android:defaultValue="@string/pref_default_dark_color_scheme"
+            app:useSimpleSummaryProvider="true"/>
+
+        <com.orgzly.android.prefs.ColorPickerPreference
+            android:key="@string/pref_key_calendar_color"
+            android:title="@string/pref_title_calendar_color"
+            android:summary="@string/pref_summary_calendar_color"
+            android:defaultValue="@string/pref_default_calendar_color"/>
+
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/other">
+        <SwitchPreference
+            android:key="@string/pref_key_is_reverse_click_action"
+            android:title="@string/reversed_note_click_action"
+            android:summary="@string/reversed_note_click_action_summary"
+            android:defaultValue="@bool/pref_default_is_reverse_click_action"/>
+
+        <ListPreference
+            android:key="@string/pref_key_font_size"
+            android:title="@string/font_size"
+            android:entries="@array/font_sizes"
+            android:entryValues="@array/font_sizes_values"
+            android:defaultValue="@string/pref_default_font_size"
+            app:useSimpleSummaryProvider="true"/>
+
+        <SwitchPreference
+            android:key="@string/pref_key_is_font_monospaced"
+            android:title="@string/monospaced_font"
+            android:summary="@string/monospaced_font_summary"
+            android:defaultValue="@bool/pref_default_is_font_monospaced"/>
+
+        <SwitchPreference
+            android:key="@string/pref_key_style_text"
+            android:title="@string/style_text_title"
+            android:summary="@string/style_text_summary"
+            android:defaultValue="@bool/pref_default_style_text"/>
+
+        <SwitchPreference
+            android:key="@string/pref_key_styled_text_with_marks"
+            android:dependency="@string/pref_key_style_text"
+            android:title="@string/styled_text_with_marks_title"
+            android:summary="@string/styled_text_with_marks_summary"
+            android:defaultValue="@bool/pref_default_styled_text_with_marks"/>
+
+        <SwitchPreference
+            android:key="@string/pref_key_highlight_edited_rich_text"
+            android:title="@string/highlight_rich_text_being_edited"
+            android:defaultValue="@bool/pref_default_highlight_edited_rich_text" />
+
+        <SwitchPreference
+            android:key="@string/pref_key_keep_screen_on_menu_item"
+            android:title="@string/keep_screen_on_title"
+            android:summary="@string/keep_screen_on_summary"
+            android:defaultValue="@bool/pref_default_keep_screen_on_menu_item"/>
+
+        <SwitchPreference
+            android:key="@string/pref_key_ignore_system_locale"
+            android:title="Use English language"
+            android:summary="Ignore default locale"
+            android:defaultValue="@bool/pref_default_ignore_system_locale"/>
+
+        <SwitchPreference
+            android:key="@string/pref_key_default_advanced_search"
+            android:title="@string/default_to_advanced_query"
+            android:defaultValue="@bool/pref_default_default_advanced_search"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/agenda">
+
+        <SwitchPreference
+            android:key="@string/pref_key_hide_empty_days_in_agenda"
+            android:title="@string/hide_empty_days_in_agenda"
+            android:defaultValue="@bool/pref_default_hide_empty_days_in_agenda" />
+
+        <SwitchPreference
+            android:key="@string/pref_key_group_scheduled_with_today"
+            android:title="@string/group_scheduled_with_today"
+            android:summary="@string/group_scheduled_with_today_summary"
+            android:defaultValue="@bool/pref_default_group_scheduled_with_today" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/today">
+
+        <ListPreference
+            android:key="@string/pref_key_today_density"
+            android:title="@string/today_list_density"
+            android:entries="@array/list_density"
+            android:entryValues="@array/list_density_values"
+            android:defaultValue="@string/pref_default_today_density" />
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

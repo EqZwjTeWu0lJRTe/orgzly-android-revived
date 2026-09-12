@@ -1,0 +1,118 @@
+Benvenuto su Orgzly!
+
+* Note
+** Clicca sulla nota per aprirla
+** Tieni premuta la nota per selezionarla
+
+Puoi selezionare più note.
+
+** Tieni premuto e muovi velocemente a destra per aprire il suo menu rapido
+
+Trascina verso sinistra per aprire un menu diverso.
+
+** Apri una nota che contiene sotto-note premendo sull'icona vicina ad essa
+
+Fare clic sull'icona per dispiegare l'intero sotto-albero.
+
+** Non ci sono limiti al numero di livelli che puoi avere
+**** Usalo per meglio organizzare le tue note
+
+*** Ora puoi avere anche le etichette :tag1:tag2:
+*** La sotto-nota eredita l'etichetta :tag3:
+
+Se si cercano note con tag “tag1” utilizzando la query “t.tag1”, questa nota sarà inclusa nei risultati di ricerca.
+
+*** La nota con il tag =ARCHIVE= impostato è colorata in grigio:ARCHIVE:
+
+** La nota può avere uno stato
+
+È possibile configurare qualsiasi numero di stati da usare: TODO, NEXT, DONE, ecc.
+
+*** TODO Ci sono due /tipi/ di stati: todo e done
+
+*** DONE Questa è una nota con il tipo di stato /done/
+CLOSED: [2018-01-24 Mer 17:00]
+
+** Le note gerarchicamente superiori possono tracciare lo stato di quelle sotto di loro [1/3] [33%]
+
+*** TODO Per tenere traccia del rapporto TODO/ DONE aggiungere [/] al titolo della nota
+
+*** TODO Per avere il rapporto DONE/TODO in percentuale, aggiungere [%] al titolo della nota
+
+*** DONE Possono essere usate entrambe in tandem
+CLOSED: [2025-03-13 Thu 08:37]
+
+Non importa l'ordine e i conteggi verranno aggiornati automaticamente .
+
+** La nota può avere un orario programmato
+SCHEDULED: <2015-02-20 Ven 15:15>
+
+*** Gli orari possono avere una ripetizione
+SCHEDULED: <2015-02-16 Lun .+2d>
+
+** Puoi anche stabilire una scadenza
+DEADLINE: <2015-02-20 Ven>
+
+** Event times can be used anywhere in the note's content
+
+You can have multiple event times:
+
+- <2015-02-20 Fri>
+- <2015-02-21 Sat>
+
+** Sono supportati i promemoria per i task pianificati e per le scadenze
+
+Contrassegna la nota come conclusa (DONE) per spostarne la ripetizione.
+
+** [#A] Le note possono avere una priorità
+
+È possibile modificare il numero di priorità nelle impostazioni. Puoi anche cambiare la priorità predefinita - la proprietà impostata per le note in cui non viene specificata.
+
+** Le note possono includere link
+
+Digita un numero di telefono (tel:555-0199), invia SMS (sms:555-0199), componi un'email (mailto:support@orgzlyrevived.com) o visita una pagina web ([[https://www.orgzlyrevived.com][Orgzlyrevived.com]]).
+
+Puoi anche collegarti a un'altra nota o a un taccuino all'interno dell'app.
+
+Vai su https://www.orgzlyrevived.com/docs#links per maggiori informazioni.
+
+** Sono supportate le formattazioni di base
+
+Puoi usare parole in *grassetto*, /corsivo/, _sottolineato_, =scandito=, ~tipo codice~ e +barrato+.
+
+** È disponibile una lista di spunte
+
+- [X] Attività 1
+- [ ] Attività 2
+- [ ] Attività 3
+
+Fare clic sulla casella per cambiarne lo stato. Premere il pulsante nuova riga alla fine della linea per creare un nuovo elemento.
+
+** Il titolo della nota può anche contenere lo stato di avanzamento  [66%] [2/3]
+
+- [X] Attività 1
+- [ ] Attività 2
+- [X] Attività 3
+
+* Cerca
+** Sono supportati molti operatori di ricerca
+
+Le note possono essere cercate per stato, per tag, per  programmazione o per scadenza ecc.
+
+Vai su [[https://www.orgzlyrevived.com/docs#search]] per saperne di più.
+
+** Le stringhe di ricerca possono essere salvate per un rapido accesso
+
+Prova a fare ricerche semplici dal cassetto di navigazione e annota quali stringhe usino.
+
+Puoi creare le tue ricerche salvate premendo su "Ricerche" nel menu di navigazione.
+
+* Sincronizzazione
+
+** I taccuini possono essere salvati come file di testo
+
+I file sono nel formato usato da [[https://orgmode.org/][Org mode]].
+
+** Tipo di percorso (repository)
+
+Puoi tenere sincronizzati i taccuini sul tuo dispositivo mobile in una directory, su di una scheda di memoria o su Dropbox.

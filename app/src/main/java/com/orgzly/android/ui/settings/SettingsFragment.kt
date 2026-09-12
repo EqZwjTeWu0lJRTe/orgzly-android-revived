@@ -1,0 +1,747 @@
+package com.orgzly.android.ui.settings
+
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.annotation.StringRes
+import androidx.preference.*
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.orgzly.BuildConfig
+import com.orgzly.R
+import com.orgzly.android.App
+import com.orgzly.android.AppIntent
+import com.orgzly.android.ai.AiApi
+import com.orgzly.android.calendar.CalendarWorker
+import com.orgzly.android.SharingShortcutsManager
+import com.orgzly.android.data.DataRepository
+import com.orgzly.android.git.SshKey
+import com.orgzly.android.prefs.*
+import com.orgzly.android.reminders.RemindersScheduler
+import com.orgzly.android.sync.AutoSyncScheduler
+import com.orgzly.android.ui.CommonActivity
+import com.orgzly.android.ui.NoteStates
+import com.orgzly.android.ui.capture.getDisplayName
+import com.orgzly.android.ui.dialogs.ShowSshKeyDialogFragment
+import com.orgzly.android.ui.notifications.Notifications
+import com.orgzly.android.ui.util.KeyboardUtils
+import com.orgzly.android.usecase.NoteReparseStateAndTitles
+import com.orgzly.android.usecase.NoteSyncCreatedAtTimeWithProperty
+import com.orgzly.android.usecase.UseCase
+import com.orgzly.android.util.AppPermissions
+import com.orgzly.android.util.LogUtils
+import com.orgzly.android.widgets.ListWidgetProvider
+import com.orgzly.android.ui.settings.exporting.SettingsExportFragment
+import com.orgzly.android.ui.settings.importing.SettingsImportFragment
+import androidx.core.graphics.toColorInt
+import javax.inject.Inject
+
+/**
+ * Displays settings.
+ */
+class SettingsFragment : PreferenceFragmentCompat(), SharedPreferences.OnSharedPreferenceChangeListener {
+    private var listener: Listener? = null
+
+    @Inject
+    lateinit var dataRepository: DataRepository
+
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        App.appComponent.inject(this)
+
+        listener = activity as Listener
+    }
+
+    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        addPreferencesFromResource()
+
+        setupPreferences()
+    }
+
+    private fun addPreferencesFromResource() {
+        when (val resourceName = arguments?.getString(ARG_RESOURCE)) {
+            null -> addPreferencesFromResource(R.xml.prefs) // Headings
+            in PREFS_RESOURCES -> addPreferencesFromResource(PREFS_RESOURCES.getValue(resourceName))
+        }
+    }
+
+    private fun setupPreferences() {
+        /* Make icons lighter. */
+//        preferenceScreen?.let {
+//            for (i in 0 until it.preferenceCount) {
+//                it.getPreference(i)?.icon?.alpha = 140
+//            }
+//        }
+
+
+        preference(R.string.pref_key_clear_database)?.let {
+            it.setOnPreferenceClickListener {
+                listener?.onDatabaseClearRequest()
+                true
+            }
+        }
+
+        preference(R.string.pref_key_export_settings)?.let {
+            it.setOnPreferenceClickListener {
+                SettingsExportFragment().show(childFragmentManager, SettingsExportFragment.FRAGMENT_TAG)
+                true
+            }
+        }
+
+        preference(R.string.pref_key_import_settings)?.let {
+            it.setOnPreferenceClickListener {
+                SettingsImportFragment().show(childFragmentManager, SettingsImportFragment.FRAGMENT_TAG)
+                true
+            }
+        }
+
+        preference(R.string.pref_key_reload_getting_started)?.let {
+            it.setOnPreferenceClickListener {
+                listener?.onGettingStartedNotebookReloadRequest()
+                true
+            }
+        }
+
+        preference(R.string.pref_key_widget_capture_template)?.let {
+            it.setOnPreferenceClickListener {
+                showWidgetCaptureTemplateDialog()
+                true
+            }
+        }
+
+        setupVersionPreference()
+
+        setupGitCommitPreference()
+
+        setDefaultStateForNewNote()
+
+        preference(R.string.pref_key_file_absolute_root)?.let {
+            val pref = it as EditTextPreference
+            pref.text = AppPreferences.fileAbsoluteRoot(context)
+        }
+
+        preference(R.string.pref_key_file_relative_root)?.let {
+            val pref = it as EditTextPreference
+            pref.text = AppPreferences.fileRelativeRoot(context)
+        }
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            preference(R.string.pref_key_reminders_notification_settings_V26)?.let {
+                preferenceScreen.removePreference(it)
+            }
+        } else {
+            preference(R.string.pref_key_reminders_notification_settings_preV26)?.let {
+                preferenceScreen.removePreference(it)
+            }
+        }
+
+        // Disable Git repos completely on API < 23 and in the Play Store build
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || BuildConfig.IS_GIT_REMOVED) {
+            preference(R.string.pref_key_git_is_enabled)?.let {
+                preferenceScreen.removePreference(it)
+            }
+        }
+
+        /* Disable SSH key generation if Git repository type is not enabled */
+        if (!AppPreferences.gitIsEnabled(context)) {
+            preference(R.string.pref_key_ssh_keygen)?.let {
+                preferenceScreen.removePreference(it)
+            }
+        }
+
+        preference(R.string.pref_key_ssh_show_public_key)?.let {
+            if (AppPreferences.gitIsEnabled(context) && SshKey.canShowSshPublicKey) {
+                it.setOnPreferenceClickListener {
+                    ShowSshKeyDialogFragment().show(childFragmentManager, "public_key")
+                    true
+                }
+            } else {
+                preferenceScreen.removePreference(it)
+            }
+        }
+
+        /* Update preferences which depend on multiple others. */
+        updateRemindersScreen()
+        updateWidgetScreen()
+        setupCalendarSyncSearchPreference()
+
+        findPreference<androidx.preference.Preference>("prefs_screen_capture_templates")?.setOnPreferenceClickListener {
+            listener?.onCaptureTemplatesRequest()
+            true
+        }
+    }
+
+    private fun setupCalendarSyncSearchPreference() {
+        val pref = preference(R.string.pref_key_calendar_sync_search) as? ListPreference ?: return
+
+        val entries = ArrayList<CharSequence>()
+        val entryValues = ArrayList<CharSequence>()
+
+        // Default option: all notes with scheduled/deadline
+        entries.add(getString(R.string.calendar_sync_search_all_notes))
+        entryValues.add("-1")
+
+        // Add saved searches
+        try {
+            val searches = dataRepository.getSavedSearches()
+            for (search in searches) {
+                entries.add(search.name)
+                entryValues.add(search.id.toString())
+            }
+        } catch (e: Exception) {
+            LogUtils.d(TAG, "Failed to load saved searches")
+        }
+
+        pref.entries = entries.toTypedArray()
+        pref.entryValues = entryValues.toTypedArray()
+    }
+
+    private fun setupVersionPreference() {
+        preference(R.string.pref_key_version)?.let { pref ->
+            /* Set summary to the current version string, appending suffix for the flavor. */
+            pref.summary = BuildConfig.VERSION_NAME + BuildConfig.VERSION_NAME_SUFFIX
+
+            /* Display changelog dialog when version is clicked. */
+            pref.setOnPreferenceClickListener {
+                listener?.onWhatsNewDisplayRequest()
+                true
+            }
+        }
+    }
+
+    private fun setupGitCommitPreference() {
+        preference(R.string.pref_key_git_commit)?.let { pref ->
+            pref.summary = BuildConfig.GIT_COMMIT
+        }
+    }
+
+    /*
+     * Display custom preference's dialog.
+     */
+    override fun onDisplayPreferenceDialog(preference: Preference) {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, preference)
+
+        when (preference) {
+            is StatesPreference ->
+                displayCustomPreferenceDialogFragment(
+                        StatesPreferenceFragment.getInstance(preference),
+                        StatesPreferenceFragment.FRAGMENT_TAG)
+
+            is IntegerPreference ->
+                displayCustomPreferenceDialogFragment(
+                        IntegerPreferenceFragment.getInstance(preference),
+                        IntegerPreferenceFragment.FRAGMENT_TAG)
+
+            is TimePreference ->
+                displayCustomPreferenceDialogFragment(
+                        TimePreferenceFragment.getInstance(preference),
+                        TimePreferenceFragment.FRAGMENT_TAG)
+
+            is NotePopupPreference ->
+                displayCustomPreferenceDialogFragment(
+                    NotePopupPreferenceFragment.getInstance(preference),
+                    NotePopupPreferenceFragment.FRAGMENT_TAG)
+
+            is ColorPickerPreference ->
+                displayCustomPreferenceDialogFragment(
+                    ColorPickerDialogFragment.newInstance(preference.key),
+                    ColorPickerDialogFragment.FRAGMENT_TAG)
+
+            else -> super.onDisplayPreferenceDialog(preference)
+        }
+    }
+
+    private fun displayCustomPreferenceDialogFragment(
+            fragment: PreferenceDialogFragmentCompat,
+            tag: String
+    ) {
+        fragmentManager?.let {
+            fragment.setTargetFragment(this, 0)
+            fragment.show(it, tag)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        listener?.onTitleChange(preferenceScreen?.title)
+        updateWidgetScreen()
+
+        /* Start to listen for any preference changes. */
+        PreferenceManager.getDefaultSharedPreferences(requireActivity())
+                .registerOnSharedPreferenceChangeListener(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+
+        /* Stop listening for preference changed. */
+        PreferenceManager.getDefaultSharedPreferences(requireActivity())
+                .unregisterOnSharedPreferenceChangeListener(this)
+    }
+
+    override fun onDetach() {
+        super.onDetach()
+
+        listener = null
+    }
+
+    /**
+     * Called when a shared preference is modified in any way.
+     * Used to update AppPreferences' static values and do any required post-settings-change work.
+     */
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key: String?) {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, sharedPreferences, key)
+
+        val activity = activity as? CommonActivity ?: return
+
+        when (key) {
+            getString(R.string.pref_key_note_popup_buttons_in_book_left),
+            getString(R.string.pref_key_note_popup_buttons_in_book_right),
+            getString(R.string.pref_key_note_popup_buttons_in_query_left),
+            getString(R.string.pref_key_note_popup_buttons_in_query_right) -> {
+                findPreference<NotePopupPreference>(key)?.summary =
+                    sharedPreferences.getString(key, "")
+
+            }
+
+            // State keywords
+            getString(R.string.pref_key_states) -> {
+                AppPreferences.updateStaticKeywords(context)
+
+                /* Re-parse notes. */
+                KeyboardUtils.closeSoftKeyboard(activity)
+                listener?.onNotesUpdateRequest(NoteReparseStateAndTitles())
+
+                setDefaultStateForNewNote()
+            }
+
+            // Created-at property
+            getString(R.string.pref_key_is_created_at_added),
+            getString(R.string.pref_key_created_at_property) -> {
+                if (AppPreferences.createdAt(context)) {
+                    listener?.onNotesUpdateRequest(NoteSyncCreatedAtTimeWithProperty())
+                }
+            }
+
+            // Cancel or create an new-note ongoing notification
+            getString(R.string.pref_key_ongoing_notification),
+            getString(R.string.pref_key_ongoing_notification_priority) -> {
+                if (AppPreferences.newNoteNotification(context)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        AppPermissions.isGrantedOrRequest(
+                            activity, AppPermissions.Usage.POST_NOTIFICATIONS)
+                    }
+                    Notifications.showOngoingNotification(context)
+                } else {
+                    Notifications.cancelNewNoteNotification(context)
+                }
+            }
+
+            // Update default priority when minimum priority changes
+            getString(R.string.pref_key_min_priority) -> {
+                preference(R.string.pref_key_default_priority)?.let {
+                    val pref = it as ListPreference
+
+                    val defPri = AppPreferences.defaultPriority(context)
+                    val minPri = sharedPreferences.getString(key, null)
+
+                    // Default priority is lower then minimum
+                    if (minPri != null && defPri.compareTo(minPri, ignoreCase = true) > 0) {
+                        // minPri -> defPri
+                        // Must use preference directly to update the view too
+                        pref.value = minPri
+                    }
+                }
+            }
+
+            // Update minimum priority when default priority changes
+            getString(R.string.pref_key_default_priority) -> {
+                preference(R.string.pref_key_min_priority)?.let {
+                    val pref = it as ListPreference
+
+                    val minPri = AppPreferences.minPriority(context)
+                    val defPri = sharedPreferences.getString(key, null)
+
+                    // Default priority is lower then minimum
+                    if (defPri != null && minPri.compareTo(defPri, ignoreCase = true) < 0) {
+                        // minPri -> defPri
+                        // Must use preference directly to update the view too
+                        pref.value = defPri
+                    }
+                }
+            }
+
+            // Update widget for changed style
+            getString(R.string.pref_key_widget_color_scheme),
+            getString(R.string.pref_key_widget_opacity),
+            getString(R.string.pref_key_widget_font_size),
+            getString(R.string.pref_key_widget_display_checkmarks),
+            getString(R.string.pref_key_widget_display_book_name),
+            getString(R.string.pref_key_widget_update_frequency),
+            getString(R.string.pref_key_widget_capture_template) -> {
+                val intent = Intent(context, ListWidgetProvider::class.java).apply {
+                    action = AppIntent.ACTION_UPDATE_LAYOUT_LIST_WIDGET
+                }
+                context?.sendBroadcast(intent)
+            }
+
+            // Reminders for scheduled notes
+            getString(R.string.pref_key_use_reminders_for_scheduled_times) -> {
+                // Reset last run time
+                AppPreferences.reminderLastRunForScheduled(context, 0L)
+                if (AppPreferences.remindersForScheduledEnabled(context)) {
+                    // Ensure notifications permission
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        AppPermissions.isGrantedOrRequest(
+                            activity, AppPermissions.Usage.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+
+            // Reminders for deadlines
+            getString(R.string.pref_key_use_reminders_for_deadline_times) -> {
+                // Reset last run time
+                AppPreferences.reminderLastRunForDeadline(context, 0L)
+                if (AppPreferences.remindersForDeadlineEnabled(context)) {
+                    // Ensure notifications permission
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        AppPermissions.isGrantedOrRequest(
+                            activity, AppPermissions.Usage.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+
+            // Reminders for events
+            getString(R.string.pref_key_use_reminders_for_event_times) -> {
+                // Reset last run time
+                AppPreferences.reminderLastRunForEvents(context, 0L)
+                if (AppPreferences.remindersForEventsEnabled(context)) {
+                    // Ensure notifications permission
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        AppPermissions.isGrantedOrRequest(
+                            activity, AppPermissions.Usage.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+
+            // Scheduled sync
+            getString(R.string.pref_key_auto_sync_at_interval_enabled),
+            getString(R.string.pref_key_auto_sync_interval_in_mins) -> {
+                if (AppPreferences.scheduledSyncEnabled(context)) {
+                    AutoSyncScheduler.cancelAll(requireContext())
+                    AutoSyncScheduler.schedule(requireContext())
+                } else {
+                    AutoSyncScheduler.cancelAll(requireContext())
+                }
+            }
+
+            // Display images inline enabled - request permission
+            getString(R.string.pref_key_images_enabled) -> {
+                if (AppPreferences.imagesEnabled(context)) {
+                    Handler().post {
+                        AppPermissions.isGrantedOrRequest(
+                                activity, AppPermissions.Usage.EXTERNAL_FILES_ACCESS)
+                    }
+                }
+            }
+
+            // Notification on failed sync - request permission
+            getString(R.string.pref_key_show_sync_notifications) -> {
+                if (AppPreferences.showSyncNotifications(context)) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        AppPermissions.isGrantedOrRequest(
+                            activity, AppPermissions.Usage.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+
+            // Calendar sync
+            getString(R.string.pref_key_calendar_sync_enable) -> {
+                if (AppPreferences.isCalendarSyncEnabled(requireContext())) {
+                    AppPermissions.isGrantedOrRequest(
+                        activity, AppPermissions.Usage.CALENDAR_SYNC)
+
+                    val calendarRequest = OneTimeWorkRequestBuilder<CalendarWorker>().build()
+                    WorkManager.getInstance(requireContext()).enqueue(calendarRequest)
+                } else {
+                    // Cleanup: Delete calendar if disabled
+                    val calendarRequest = OneTimeWorkRequestBuilder<CalendarWorker>()
+                        .setInputData(androidx.work.workDataOf(CalendarWorker.KEY_ACTION to CalendarWorker.ACTION_DELETE))
+                        .build()
+                    WorkManager.getInstance(requireContext()).enqueue(calendarRequest)
+                }
+            }
+
+            // Calendar color
+            getString(R.string.pref_key_calendar_color) -> {
+                if (AppPreferences.isCalendarSyncEnabled(requireContext())) {
+                    // Update calendar color when preference changes
+                    updateCalendarColorFromPreferences(requireContext())
+                }
+            }
+        }
+
+        updateRemindersScreen()
+        updateWidgetScreen()
+
+        /* Always notify about possibly changed data, if settings are modified.
+         *
+         * For example:
+         * - Changing states or priorities can affect the displayed data
+         * - Enabling or disabling reminders needs to trigger reminder service notification
+         */
+        RemindersScheduler.notifyDataSetChanged(requireContext())
+        ListWidgetProvider.notifyDataSetChanged(requireContext())
+        SharingShortcutsManager().replaceDynamicShortcuts(requireContext())
+    }
+
+    private fun updateRemindersScreen() {
+        val scheduled = preference(R.string.pref_key_use_reminders_for_scheduled_times)
+        val deadline = preference(R.string.pref_key_use_reminders_for_deadline_times)
+        val event = preference(R.string.pref_key_use_reminders_for_event_times)
+
+        if (scheduled != null && deadline != null && event != null) {
+            val remindersEnabled =
+                    (scheduled as TwoStatePreference).isChecked
+                            || (deadline as TwoStatePreference).isChecked
+                            || (event as TwoStatePreference).isChecked
+
+            /* These do not exist on Oreo and later */
+            preference(R.string.pref_key_reminders_sound)?.isEnabled = remindersEnabled
+            preference(R.string.pref_key_reminders_led)?.isEnabled = remindersEnabled
+            preference(R.string.pref_key_reminders_vibrate)?.isEnabled = remindersEnabled
+
+            /* This does not exist before Oreo. */
+            preference(R.string.pref_key_reminders_channel_notification_settings)?.isEnabled = remindersEnabled
+
+            preference(R.string.pref_key_snooze_time)?.isEnabled = remindersEnabled
+            preference(R.string.pref_key_snooze_type)?.isEnabled = remindersEnabled
+            preference(R.string.pref_key_daily_reminder_time)?.isEnabled = remindersEnabled
+        }
+    }
+
+    private fun updateWidgetScreen() {
+        val colorScheme = preference(R.string.pref_key_widget_color_scheme)
+
+        if (colorScheme != null) {
+            /* Widget opacity isn't supported on the dynamic color scheme. */
+            val opacityEnabled = (colorScheme as ListPreference).value != "dynamic"
+            preference(R.string.pref_key_widget_opacity)?.isEnabled = opacityEnabled
+        }
+
+        preference(R.string.pref_key_widget_capture_template)?.summary =
+            widgetCaptureTemplateSummary()
+    }
+
+    private fun showWidgetCaptureTemplateDialog() {
+        val templates = AppPreferences.captureTemplates(requireContext())
+        val defaultLabel = getString(R.string.widget_capture_template_default_note)
+        val selectedId = AppPreferences.widgetCaptureTemplateId(requireContext())
+        val labels = buildList {
+            add(defaultLabel)
+            addAll(templates.mapIndexed { index, template ->
+                template.getDisplayName(getString(R.string.capture_template_numbered, index + 1))
+            })
+        }.toTypedArray()
+        val checkedItem = templates.indexOfFirst { it.id == selectedId }
+            .let { if (it >= 0) it + 1 else 0 }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.capture_template)
+            .setSingleChoiceItems(labels, checkedItem) { dialog, which ->
+                AppPreferences.widgetCaptureTemplateId(
+                    requireContext(),
+                    if (which == 0) null else templates[which - 1].id
+                )
+                updateWidgetScreen()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun widgetCaptureTemplateSummary(): String {
+        val selectedId = AppPreferences.widgetCaptureTemplateId(requireContext())
+        val selectedTemplate = AppPreferences.captureTemplates(requireContext())
+            .find { it.id == selectedId }
+        return selectedTemplate?.getDisplayName(getString(R.string.capture_template))
+            ?: getString(R.string.widget_capture_template_default_note)
+    }
+
+    /**
+     * Update list of possible states that can be used as default for a new note.
+     */
+    private fun setDefaultStateForNewNote() {
+        preference(R.string.pref_key_new_note_state)?.let {
+            val pref = it as ListPreference
+
+            /* NOTE followed by to-do keywords */
+            val entries = LinkedHashSet<CharSequence>()
+            entries.add(NoteStates.NO_STATE_KEYWORD)
+            entries.addAll(AppPreferences.todoKeywordsSet(context))
+            val entriesArray = entries.toTypedArray()
+
+            /* Set possible values. */
+            pref.entries = entriesArray
+            pref.entryValues = entriesArray
+
+            /* Set current value. */
+            val value = AppPreferences.newNoteState(context)
+            if (entries.contains(value)) {
+                pref.value = value
+            } else {
+                pref.value = NoteStates.NO_STATE_KEYWORD
+            }
+        }
+    }
+
+    override fun onPreferenceTreeClick(preference: Preference): Boolean {
+        if (preference.key == "ai_test") {
+            testAiConnection()
+            return true
+        }
+
+        if (preference is PreferenceScreen) {
+            preference.key?.let { key ->
+                if (key in PREFS_RESOURCES) {
+                    listener?.onPreferenceScreen(key)
+                    return true
+                }
+            }
+        }
+
+        return super.onPreferenceTreeClick(preference)
+    }
+
+    private fun preference(@StringRes resId: Int): Preference? {
+        return findPreference(getString(resId))
+    }
+
+    private fun testAiConnection() {
+        val context = requireContext()
+
+        val base = AppPreferences.aiApiBase(context)
+        val key = AppPreferences.aiApiKey(context)
+        val model = AppPreferences.aiModel(context)
+
+        if (base.isBlank() || key.isBlank()) {
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.ai_test_title)
+                .setMessage(R.string.ai_need_config)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+            return
+        }
+
+        com.orgzly.android.App.EXECUTORS.diskIO().execute {
+            val outcome = try {
+                AiApi.test(base, key, model)
+                null
+            } catch (e: Exception) {
+                e.message ?: getString(R.string.ai_no_network)
+            }
+
+            activity?.runOnUiThread {
+                if (!isAdded) return@runOnUiThread
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.ai_test_title)
+                    .setMessage(if (outcome == null) getString(R.string.ai_test_ok) else getString(R.string.ai_test_failed, outcome))
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
+        }
+    }
+
+    interface Listener {
+        fun onNotesUpdateRequest(action: UseCase)
+        fun onDatabaseClearRequest()
+        fun onGettingStartedNotebookReloadRequest()
+        fun onWhatsNewDisplayRequest()
+        fun onPreferenceScreen(resource: String)
+        fun onTitleChange(title: CharSequence?)
+        fun onCaptureTemplatesRequest()
+    }
+
+    companion object {
+        private val TAG: String = SettingsFragment::class.java.name
+
+        val FRAGMENT_TAG: String = SettingsFragment::class.java.name
+
+        private const val ARG_RESOURCE = "resource"
+
+        /* Using headers file & fragments didn't work well - transitions were
+         * not smooth, previous fragment would be briefly displayed.
+         */
+        @JvmField
+        val PREFS_RESOURCES: HashMap<String, Int> = hashMapOf(
+                "prefs_screen_look_and_feel" to R.xml.prefs_screen_look_and_feel,
+                "prefs_screen_notebooks" to R.xml.prefs_screen_notebooks,
+                "prefs_screen_notifications" to R.xml.prefs_screen_notifications,
+                "prefs_screen_reminders" to R.xml.prefs_screen_reminders,
+                "prefs_screen_sync" to R.xml.prefs_screen_sync,
+                "prefs_screen_auto_sync" to R.xml.prefs_screen_auto_sync, // Sub-screen
+                "prefs_screen_org_file_format" to R.xml.prefs_screen_org_file_format, // Sub-screen
+                "prefs_screen_org_mode_tags_indent" to R.xml.prefs_screen_org_mode_tags_indent, // Sub-screen
+                "prefs_screen_widget" to R.xml.prefs_screen_widget, // Sub-screen
+                "prefs_screen_developer" to R.xml.prefs_screen_developer, // Sub-screen
+                "prefs_screen_app" to R.xml.prefs_screen_app,
+                "prefs_screen_ai" to R.xml.prefs_screen_ai
+        )
+
+        fun getInstance(res: String? = null): SettingsFragment {
+            val fragment = SettingsFragment()
+
+            val args = Bundle()
+            args.putString(ARG_RESOURCE, res)
+            fragment.arguments = args
+
+            return fragment
+        }
+    }
+
+    private fun updateCalendarColorFromPreferences(context: Context) {
+        try {
+            val colorHex = AppPreferences.calendarColor(context)
+            val calendarColor = colorHex.toColorInt()
+            
+            // Get calendar ID
+            val projection = arrayOf(android.provider.CalendarContract.Calendars._ID)
+            val selection = "${android.provider.CalendarContract.Calendars.ACCOUNT_NAME} = ? AND ${android.provider.CalendarContract.Calendars.ACCOUNT_TYPE} = ?"
+            val selectionArgs = arrayOf("Orgzly", "com.orgzly.android")
+
+            context.contentResolver.query(
+                android.provider.CalendarContract.Calendars.CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val calendarId = cursor.getLong(0)
+                    
+                    // Update calendar color
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.CalendarContract.Calendars.CALENDAR_COLOR, calendarColor)
+                    }
+                    val uri = android.provider.CalendarContract.Calendars.CONTENT_URI
+                        .buildUpon()
+                        .appendQueryParameter(android.provider.CalendarContract.CALLER_IS_SYNCADAPTER, "true")
+                        .appendQueryParameter(android.provider.CalendarContract.Calendars.ACCOUNT_NAME, "Orgzly")
+                        .appendQueryParameter(android.provider.CalendarContract.Calendars.ACCOUNT_TYPE, "com.orgzly.android")
+                        .appendPath(calendarId.toString())
+                        .build()
+                    
+                    context.contentResolver.update(uri, values, null, null)
+                }
+            }
+        } catch (e: Exception) {
+            // Log error but don't crash
+            LogUtils.d(TAG, "Failed to update calendar color", e)
+        }
+    }
+}

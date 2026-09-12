@@ -1,0 +1,28 @@
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="AlwaysShowAction">
+
+    <item
+        android:id="@+id/notes_action_move_left"
+        android:icon="@drawable/ic_arrow_back"
+        app:showAsAction="always"
+        android:title="@string/heads_moving_action_menu_item_promote"/>
+    <item
+        android:id="@+id/notes_action_move_down"
+        android:icon="@drawable/ic_arrow_downward"
+        app:showAsAction="always"
+        android:title="@string/heads_moving_action_menu_item_down"/>
+    <item
+        android:id="@+id/notes_action_move_up"
+        android:icon="@drawable/ic_arrow_upward"
+        app:showAsAction="always"
+        android:title="@string/heads_moving_action_menu_item_up"/>
+    <item
+        android:id="@+id/notes_action_move_right"
+        android:icon="@drawable/ic_arrow_forward"
+        app:showAsAction="always"
+        android:title="@string/heads_moving_action_menu_item_demote"/>
+
+</menu>

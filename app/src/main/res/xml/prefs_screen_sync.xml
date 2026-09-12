@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:title="@string/sync">
+
+    <Preference
+        android:key="@string/pref_key_repos"
+        android:title="@string/repos_preference_title"
+        android:summary="@string/repos_preference_summary">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="@string/application_id"
+            android:targetClass="com.orgzly.android.ui.repos.ReposActivity"/>
+    </Preference>
+
+    <EditTextPreference
+        android:key="@string/pref_key_orgzlyignore_file"
+        android:title="@string/orgzlyignore_file"
+        android:selectAllOnFocus="true"
+        android:inputType="text"
+        android:singleLine="true"
+        android:dialogMessage="@string/orgzlyignore_file_desc"
+        android:defaultValue="@string/pref_default_orgzlyignore_file"
+        app:useSimpleSummaryProvider="true"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_enable_repo_subfolders"
+        android:title="@string/enable_repo_subfolders_preferences_title"
+        android:summary="@string/enable_repo_subfolders_preferences_summary"
+        android:defaultValue="@bool/pref_default_enable_repo_subfolders"/>
+
+    <SwitchPreference
+        android:key="@string/pref_key_calendar_sync_enable"
+        android:title="@string/pref_title_calendar_sync_enable"
+        android:summary="@string/pref_summary_calendar_sync_enable"
+        android:defaultValue="@bool/pref_default_calendar_sync_enable"/>
+
+    <ListPreference
+        android:key="@string/pref_key_calendar_sync_search"
+        android:title="@string/pref_title_calendar_sync_search"
+        android:summary="@string/pref_summary_calendar_sync_search"
+        android:defaultValue="@string/pref_default_calendar_sync_search"
+        android:dependency="@string/pref_key_calendar_sync_enable"
+        android:entryValues="@array/calendar_sync_search_entries"
+        app:useSimpleSummaryProvider="true"/>
+
+    <androidx.preference.PreferenceScreen
+        android:key="prefs_screen_auto_sync"
+        android:title="@string/auto_sync"
+        android:summary="@string/auto_sync_summary">
+    </androidx.preference.PreferenceScreen>
+
+    <Preference
+        android:key="@string/pref_key_ssh_keygen"
+        android:title="@string/ssh_keygen_preference_title"
+        android:summary="@string/ssh_keygen_preference_summary">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="@string/application_id"
+            android:targetClass="com.orgzly.android.ui.SshKeygenActivity"/>
+    </Preference>
+
+    <Preference
+        android:key="@string/pref_key_ssh_show_public_key"
+        android:title="@string/ssh_show_public_key_preference_title">
+    </Preference>
+
+    <PreferenceCategory android:title="@string/notebook_files">
+        <SwitchPreference
+            android:key="@string/pref_key_is_created_at_added"
+            android:title="@string/use_created_at_property"
+            android:summary="@string/use_created_at_property_summary"
+            android:defaultValue="@bool/pref_default_is_created_at_added"/>
+
+        <EditTextPreference
+            android:key="@string/pref_key_created_at_property"
+            android:dependency="@string/pref_key_is_created_at_added"
+            android:title="@string/created_at_property"
+            android:dialogTitle="@string/property_name"
+            android:inputType="text"
+            android:defaultValue="@string/pref_default_created_at_property"
+            app:useSimpleSummaryProvider="true"/>
+
+        <androidx.preference.PreferenceScreen
+            android:key="prefs_screen_org_file_format"
+            android:title="@string/org_file_format"
+            android:summary="@string/org_file_format_summary">
+        </androidx.preference.PreferenceScreen>
+    </PreferenceCategory>
+</androidx.preference.PreferenceScreen>

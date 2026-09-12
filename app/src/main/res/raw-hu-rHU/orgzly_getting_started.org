@@ -1,0 +1,118 @@
+Üdv az Orgzly jegyzetelőben!
+
+* Jegyzetek
+** Koppints a bejegyzés megnyitásához
+** Tartsd lenyomva a bejegyzés kijelöléséhez
+
+Kijelölhetsz több bejegyzést is.
+
+** Jobbra simítva megnyílik a gyorsmenü
+
+Balra simítva egy másik menü nyílik meg.
+
+** Ha egy bejegyzés tartalmaz aljegyzeteket is, be lehet hajtogatni azokat, ha az ikonra koppintasz mellette
+
+Hosszú koppintás az ikonon megnyitja az egész fát.
+
+*** Nincs korlátozva, hogy hány szinten lehet aljegyzet
+**** Így könnyebb elrendezni a bejegyzéseket
+
+** Lehet címkéket is ragasztani bejegyzésekre :címke1:címke2:
+*** Az aljegyzet örökli a címkéket :címke3:
+
+Ha a "címke1" címkéjű bejegyzéseket keresed a "t.címke1" lekérdezés használatával, akkor ez a bejegyzés benne lesz a keresési eredményben.
+
+*** Az =ARCHIVE= -nak cimkézett jegyzet kiszürkített :ARCHIVE:
+
+** TODO Egy bejegyzésnek állapota is lehet
+
+Létre lehet hozni akárhány állapot jelzőt: TODO, NEXT, DONE, stb.
+
+*** Kétféle /típusa/ lehet az állapotoknak: to-do (tennivaló) és done (kész)
+
+*** DONE Ennek a bejegyzésnek az állapota /done/, vagyis /kész/
+CLOSED: [2018-01-24 Wed 17:00]
+
+** Parent notes can track state of child notes [1/3] [33%]
+
+*** TODO To track the ratio of TODO vs DONE items, add [/] to the note's title
+
+*** TODO To track the percentage of DONE vs TODO items, add [%] to the note's title
+
+*** DONE Both can be used in tandem
+CLOSED: [2025-03-13 Thu 08:37]
+
+The order doesn't matter, and the counts will be updated automatically.
+
+** Egy bejegyzést ütemezni is lehet
+SCHEDULED: <2015-02-20 Fri 15:15>
+
+*** Ismétlődő időt is be lehet állítani
+SCHEDULED: <2015-02-16 Mon .+2d>
+
+** Határidőt is be lehet állítani
+DEADLINE: <2015-02-20 Fri>
+
+** Event times can be used anywhere in the note's content
+
+You can have multiple event times:
+
+- <2015-02-20 Fri>
+- <2015-02-21 Sat>
+
+** Az ütemezett és a határidőkhöz emlékeztetőt is lehet beállítani
+
+Alaphelyzetben ez le van tiltva, engedélyezni kell a Beállításokban.
+
+** [#A] Egy jegyzetnek lehet prioritása
+
+A prioritások számát megadhatod a Beállításokban. Az alap prioritást is át lehet állítani - bármely bejegyzésnek ez lesz a prioritása ha nincs külön beállítva.
+
+** Linket is tartalmazhat egy bejegyzés
+
+Hívj fel egy számot (tel:555-0199), küldj SMS-t (sms:555-0199), írj emailt (mailto:support@orgzlyrevived.com) vagy látogass meg egy weboldalt ([[https://www.orgzlyrevived.com][Orgzlyrevived.com]]).
+
+Lehet más bejegyzéshez vagy az appon belül másik jegyzetfüzethez is linket megadni.
+
+További információ a [[https://www.orgzlyrevived.com/docs#links]] címen.
+
+** Az alapvető tipográfiai kiemeléseket támogatja a program
+
+Lehet egy szó *félkövér*, /dőlt/, _aláhúzva_, =szó szerinti=, ~kód~ és +áthúzva+.
+
+** Jelölő négyzetet is használhatunk
+
+- [X] Feladat 1
+- [ ] Feladat 2
+- [ ] Feladat 3
+
+Kattintás a jelölőnégyzetre átváltja azt. Új elem létrehozása a sor végén az új-sor gomb megnyomásával a is lehetséges.
+
+** A note's title can also track checkbox list states [66%] [2/3]
+
+- [X] Task 1
+- [ ] Task 2
+- [X] Task 3
+
+* Keresés
+** Elég sok kereső operátort támogat a program
+
+Rá lehet keresni például állapotra, címkékre, ütemezésre vagy határidőre, stb.
+
+Erről többet a [[https://www.orgzlyrevived.com/docs#search]] oldalon tanulhatsz.
+
+** A keresési kifejezéseket el lehet menteni, hogy gyorsan hozzáférjünk később
+
+Próbáld ki a kész kereséseket a navigációs fiókban és tekintsd meg ott a lekérdezéseket.
+
+Létrehozhatsz saját elmentett kereséseket a navigációs fiókban a "Keresés"-re koppintva.
+
+* Szinkronizálás
+
+** A jegyzettömböket szövegfáljként lehet menteni
+
+A mentett fájlok formátuma [[https://orgmode.org/][Org mode]].
+
+** A tárolók típusa
+
+Szinkronizálni lehet a jegyzettömböket egy könyvtárral a mobil eszközön, az SD kártyán, vagy a Dropbox-ban.

@@ -1,0 +1,3375 @@
+package com.orgzly.android.data
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
+import android.content.res.Resources
+import android.media.MediaScannerConnection
+import android.net.Uri
+import android.os.Build
+import android.os.Handler
+import android.text.TextUtils
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.map
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.sqlite.db.SupportSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQueryBuilder
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import com.google.gson.JsonSyntaxException
+import com.orgzly.BuildConfig
+import com.orgzly.R
+import com.orgzly.android.*
+import com.orgzly.android.data.mappers.OrgMapper
+import com.orgzly.android.db.NotesClipboard
+import com.orgzly.android.db.OrgzlyDatabase
+import com.orgzly.android.db.dao.NoteDao
+import com.orgzly.android.db.dao.NoteDao.NoteIdBookId
+import com.orgzly.android.db.dao.NoteViewDao
+import com.orgzly.android.db.dao.ReminderTimeDao
+import com.orgzly.android.db.entity.*
+import com.orgzly.android.db.mappers.OrgTimestampMapper
+import com.orgzly.android.prefs.AppPreferences
+import com.orgzly.android.query.Query
+import com.orgzly.android.query.sql.SqliteQueryBuilder
+import com.orgzly.android.query.user.InternalQueryParser
+import com.orgzly.android.repos.*
+import com.orgzly.android.repos.Rook
+import com.orgzly.android.repos.VersionedRook
+import com.orgzly.android.savedsearch.FileSavedSearchStore
+import com.orgzly.android.sync.BookSyncStatus
+import com.orgzly.android.ui.NotePlace
+import com.orgzly.android.ui.Place
+import com.orgzly.android.ui.note.NoteBuilder
+import com.orgzly.android.ui.note.NotePayload
+import com.orgzly.android.usecase.RepoCreate
+import com.orgzly.android.util.*
+import com.orgzly.org.OrgActiveTimestamps
+import com.orgzly.org.OrgFile
+import com.orgzly.org.OrgFileSettings
+import com.orgzly.org.OrgProperties
+import com.orgzly.org.OrgProperty
+import com.orgzly.org.datetime.OrgDateTime
+import com.orgzly.org.datetime.OrgRange
+import com.orgzly.org.parser.OrgNestedSetParserListener
+import com.orgzly.org.parser.OrgNodeInSet
+import com.orgzly.org.parser.OrgParser
+import com.orgzly.org.parser.OrgParserWriter
+import com.orgzly.org.utils.StateChangeLogic
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.orgzly.android.calendar.CalendarWorker
+import kotlinx.coroutines.flow.Flow
+import kotlin.math.roundToInt
+import java.io.*
+import java.util.*
+import java.util.concurrent.Callable
+import javax.inject.Inject
+import javax.inject.Singleton
+
+// TODO: Split
+@Singleton
+class DataRepository @Inject constructor(
+        private val context: Context,
+        private val db: OrgzlyDatabase,
+        private val repoFactory: RepoFactory,
+        private val resources: Resources,
+        private val localStorage: LocalStorage) {
+
+    private fun triggerCalendarSync() {
+        val calendarRequest = OneTimeWorkRequestBuilder<CalendarWorker>().build()
+        WorkManager.getInstance(context).enqueue(calendarRequest)
+    }
+
+    fun forceLoadBook(bookId: Long) {
+        val book = getBookView(bookId)
+                ?: throw IOException(resources.getString(R.string.book_does_not_exist_anymore))
+
+        try {
+            if (book.linkRepo == null) {
+                throw IOException(resources.getString(R.string.message_book_has_no_link))
+            }
+
+            setBookLastActionAndSyncStatus(bookId, BookAction.forNow(
+                    BookAction.Type.PROGRESS,
+                    resources.getString(R.string.force_loading_from_uri, book.linkRepo.url)))
+
+            val repoRelativePath = BookName.getRepoRelativePath(book)
+
+            val loadedBook = loadBookFromRepo(book.linkRepo.id, book.linkRepo.type, book.linkRepo.url, repoRelativePath)
+
+            setBookLastActionAndSyncStatus(loadedBook!!.book.id, BookAction.forNow(
+                    BookAction.Type.INFO,
+                    resources.getString(R.string.force_loaded_from_uri, loadedBook.syncedTo?.uri)))
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+
+            val msg = resources.getString(R.string.force_loading_failed, e.localizedMessage)
+
+            setBookLastActionAndSyncStatus(bookId, BookAction.forNow(BookAction.Type.ERROR, msg))
+
+            throw IOException(msg)
+        }
+    }
+
+    fun forceSaveBook(bookId: Long) {
+        val book = getBookView(bookId)
+                ?: throw IOException(resources.getString(R.string.book_does_not_exist_anymore))
+
+        val repositoryPath: String = BookName.getRepoRelativePath(book)
+
+        try {
+            /* Prefer link. */
+            val repoEntity = book.linkRepo ?: defaultRepoForSavingBook()
+
+            setBookLastActionAndSyncStatus(book.book.id, BookAction.forNow(
+                    BookAction.Type.PROGRESS,
+                    resources.getString(R.string.force_saving_to_uri, repoEntity)))
+
+            saveBookToRepo(repoEntity, repositoryPath, book, BookFormat.ORG)
+
+            val savedBook = getBookView(bookId)
+
+            setBookLastActionAndSyncStatus(bookId, BookAction.forNow(
+                    BookAction.Type.INFO,
+                    resources.getString(R.string.force_saved_to_uri, savedBook?.syncedTo?.uri)))
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+
+            val msg = resources.getString(R.string.force_saving_failed, e.localizedMessage)
+
+            if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Updating status for $bookId")
+
+            setBookLastActionAndSyncStatus(bookId, BookAction.forNow(BookAction.Type.ERROR, msg))
+
+            throw IOException(msg)
+        }
+    }
+
+    /**
+     * Exports `Book`, uploads it to repo and link it to newly created
+     * [com.orgzly.android.repos.VersionedRook].
+     *
+     * @return [Book]
+     * @throws IOException
+     */
+    @Throws(IOException::class)
+    fun saveBookToRepo(
+            repoEntity: Repo,
+            repositoryPath: String,
+            bookView: BookView,
+            @Suppress("UNUSED_PARAMETER") format: BookFormat) {
+
+        val uploadedBook: VersionedRook
+
+        val repo = getRepoInstance(repoEntity.id, repoEntity.type, repoEntity.url)
+
+        val tmpFile = getTempBookFile()
+        try {
+            /* Write to temporary file. */
+            NotesOrgExporter(this).exportBook(bookView.book, tmpFile)
+
+            /* Upload to repo. */
+            uploadedBook = repo.storeBook(tmpFile, repositoryPath)
+
+        } finally {
+            /* Delete temporary file. */
+            tmpFile.delete()
+        }
+
+        updateBookLinkAndSync(bookView.book.id, uploadedBook)
+
+        updateBookIsModified(bookView.book.id, false)
+
+    }
+
+    @Throws(IOException::class)
+    fun getTempBookFile(): File {
+        return localStorage.getTempBookFile()
+    }
+
+    /*
+     * If there is only one repository, return its URL.
+     * If there are more, we don't know which one to use, so throw exception.
+     */
+    @Throws(IOException::class)
+    private fun defaultRepoForSavingBook(): Repo {
+        val repos = getRepos()
+
+        return when {
+            repos.size == 1 -> repos.first()
+            repos.isEmpty() -> throw IOException(resources.getString(R.string.no_repos))
+            else -> throw IOException(resources.getString(R.string.multiple_repos))
+        }
+    }
+
+    fun importBook(bookName: String, format: BookFormat, uri: Uri) {
+        if (doesBookExist(bookName)) {
+            throw FileNotFoundException(resources.getString(R.string.book_name_already_exists, bookName))
+        }
+
+        val book = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            loadBookFromStream(bookName, format, inputStream)
+        } ?: throw IOException(resources.getString(R.string.failed_importing_book, bookName))
+
+        val action = BookAction.forNow(BookAction.Type.INFO, resources.getString(R.string.imported))
+        setBookLastActionAndSyncStatus(book.book.id, action)
+    }
+
+    fun getBooksLiveData(): LiveData<List<BookView>> {
+        val order = AppPreferences.notebooksSortOrder(context)
+        val mtime = resources.getString(R.string.pref_value_notebooks_sort_order_modification_time)
+
+        return when (order) {
+            mtime -> db.bookView().getAllOrderByTimeLiveData()
+            else -> db.bookView().getAllFOrderByNameLiveData()
+        }
+    }
+
+    fun getBooks(): List<BookView> {
+        val order = AppPreferences.notebooksSortOrder(context)
+        val mtime = resources.getString(R.string.pref_value_notebooks_sort_order_modification_time)
+
+        return when (order) {
+            mtime -> db.bookView().getAllOrderByTime()
+            else -> db.bookView().getAllFOrderByName()
+        }
+    }
+
+    fun getBooksWithError(): List<Book> {
+        return db.book().getWithActionType(BookAction.Type.ERROR)
+    }
+
+    fun getBookView(name: String): BookView? {
+        return db.bookView().get(name)
+    }
+
+    fun getBookView(id: Long): BookView? {
+        return db.bookView().get(id)
+    }
+
+    private fun doesBookExist(name: String): Boolean {
+        return getBook(name) != null
+    }
+
+    fun getBook(name: String): Book? {
+        return db.book().get(name)
+    }
+
+    fun getBook(id: Long): Book? {
+        return db.book().get(id)
+    }
+
+    fun getBookOrThrow(id: Long): Book {
+        return db.book().get(id) ?: throw IllegalStateException("Book with ID $id not found")
+    }
+
+    fun getBookLiveData(id: Long): LiveData<Book> {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, id)
+        return db.book().getLiveData(id)
+    }
+
+    /**
+     * Returns full string content of the book in format specified. Used by tests.
+     */
+    @Throws(IOException::class)
+    fun getBookContent(name: String, @Suppress("UNUSED_PARAMETER") format: BookFormat): String? {
+        val book = getBook(name)
+
+        if (book != null) {
+            val file = getTempBookFile()
+            try {
+                NotesOrgExporter(this).exportBook(book, file)
+                return MiscUtils.readStringFromFile(file)
+            } finally {
+                file.delete()
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Creates new dummy book - temporary incomplete book
+     * (before remote book has been downloaded, or linked etc.)
+     */
+    @Throws(IOException::class)
+    fun createDummyBook(name: String): BookView {
+        if (doesBookExist(name)) {
+            throw IOException("Can't insert notebook with the same name: $name")
+        }
+
+        val book = Book(0, name, isDummy = true)
+
+        val bookId = db.book().insert(book)
+
+        db.note().insert(NoteDao.rootNote(bookId))
+
+        return BookView(Book(bookId, name, isDummy = true), 0)
+    }
+
+    /**
+     * @param dummy If true, creates a new dummy book - temporary incomplete book
+     */
+    @JvmOverloads
+    @Throws(IOException::class)
+    fun createBook(name: String, dummy: Boolean = false): BookView {
+        if (doesBookExist(name)) {
+            throw IOException(resources.getString(R.string.book_name_already_exists, name))
+        }
+
+        if (name.contains("../"))
+            throw IOException(context.getString(R.string.book_names_cannot_contain))
+
+        val book = Book(
+                0,
+                name,
+                mtime = System.currentTimeMillis(),
+                lastAction = BookAction.forNow(BookAction.Type.INFO, resources.getString(R.string.created)),
+                isDummy = dummy
+        )
+
+        val id = db.runInTransaction(Callable {
+            val id = db.book().insert(book)
+
+            db.note().insert(NoteDao.rootNote(id))
+
+            return@Callable id
+        })
+
+        return BookView(book.copy(id = id), 0)
+    }
+
+    fun deleteBook(book: BookView, deleteLinked: Boolean) {
+        if (deleteLinked) {
+            book.syncedTo?.let { vrook ->
+                val repo = getRepoInstance(vrook.repoId, vrook.repoType, vrook.repoUri.toString())
+
+                repo.delete(vrook.uri)
+            }
+        }
+
+        db.book().delete(book.book)
+    }
+
+    fun renameBook(bookView: BookView, name: String) {
+        try {
+            doRenameBook(bookView, name)
+
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+
+            val message = if (e.message != null) {
+                resources.getString(R.string.failed_renaming_book_with_reason, e.localizedMessage)
+            } else {
+                resources.getString(R.string.failed_renaming_book)
+            }
+
+            setBookLastAction(
+                    bookView.book.id, BookAction.forNow(BookAction.Type.ERROR, message))
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun doRenameBook(bookView: BookView, name: String) {
+        val book = bookView.book
+
+        val oldName = book.name
+
+        /* Make sure there is no notebook with this name. */
+        if (doesBookExist(name)) {
+            throw IOException(resources.getString(R.string.book_name_already_exists, name))
+        }
+
+        if (name.contains("../"))
+            throw IOException(context.getString(R.string.book_names_cannot_contain))
+
+        /* Make sure link's repo is the same as sync book repo. */
+        if (bookView.linkRepo != null && bookView.syncedTo != null) {
+            if (!TextUtils.equals(bookView.linkRepo.url, bookView.syncedTo.repoUri.toString())) {
+                val s = BookSyncStatus.ROOK_AND_VROOK_HAVE_DIFFERENT_REPOS.toString()
+                setBookLastActionAndSyncStatus(book.id, BookAction.forNow(BookAction.Type.ERROR, s), s)
+                return
+            }
+        }
+
+        /* Do not rename if there are local changes. */
+        if (bookView.isOutOfSync()) {
+            throw IOException("Notebook is not synced")
+        }
+
+        /* Prefer link. */
+        bookView.syncedTo?.let { vrook ->
+            val repo = getRepoInstance(vrook.repoId, vrook.repoType, vrook.repoUri.toString())
+
+            /* Do not rename if the new filename will be ignored */
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                RepoUtils.ensurePathIsNotIgnored(repo, BookName.repoRelativePath(name, BookFormat.ORG))
+
+            val movedVrook = repo.renameBook(vrook.uri, name)
+
+            updateBookLinkAndSync(book.id, movedVrook)
+        }
+
+        if (db.book().updateName(book.id, name) != 1) {
+            throw IOException()
+        }
+
+        setBookLastAction(book.id, BookAction.forNow(
+                BookAction.Type.INFO,
+                resources.getString(R.string.renamed_book_from, oldName)))
+    }
+
+    fun setBookPreface(bookId: Long, preface: String) {
+        val settings = OrgFileSettings.fromPreface(preface)
+        val filetags = Tags.fromList(settings?.filetags)
+
+        db.book().updatePreface(bookId, preface, settings.title, filetags)
+        setBookPropertiesFromPreface(bookId, preface)
+
+        updateBookIsModified(bookId, true)
+    }
+
+    fun setBookLastAction(bookId: Long, action: BookAction) {
+        db.book().updateLastAction(bookId, action.type, action.message, System.currentTimeMillis())
+    }
+
+    @JvmOverloads
+    fun setBookLastActionAndSyncStatus(bookId: Long, action: BookAction, status: String? = null) {
+        val updated = db.book().updateLastActionAndSyncStatus(
+                bookId,
+                action.type,
+                action.message,
+                System.currentTimeMillis(),
+                status)
+
+        if (BuildConfig.LOG_DEBUG)
+            LogUtils.d(TAG, "Updating book $bookId status to $status ($updated updated)")
+    }
+
+    fun updateBookLinkAndSync(bookId: Long, uploadedBook: VersionedRook) {
+        val rookUrl = uploadedBook.uri.toString()
+        val repoId = uploadedBook.repoId
+        val rookRevision = uploadedBook.revision
+        val rookMtime = uploadedBook.mtime
+
+        val rookUrlId = db.rookUrl().getOrInsert(rookUrl)
+        val rookId = db.rook().getOrInsert(repoId, rookUrlId)
+
+        val versionedRookId = db.versionedRook().replace(
+                com.orgzly.android.db.entity.VersionedRook(
+                        0, rookId, rookRevision, rookMtime))
+
+        db.bookLink().upsert(bookId, repoId)
+        db.bookSync().upsert(bookId, versionedRookId)
+    }
+
+    fun removeBookSyncedTo(bookId: Long) {
+        db.bookSync().delete(bookId)
+    }
+
+    private fun updateBookIsModified(bookId: Long, isModified: Boolean, time: Long = System.currentTimeMillis()) {
+        updateBookIsModified(setOf(bookId), isModified, time)
+    }
+
+    private fun updateBookIsModified(bookIds: Set<Long>, isModified: Boolean, time: Long = System.currentTimeMillis()) {
+        if (bookIds.isNotEmpty()) {
+            if (isModified) {
+                db.book().setIsModified(bookIds, time)
+            } else {
+                db.book().setIsNotModified(bookIds)
+            }
+        }
+    }
+
+    /**
+     * Returns default book if it exists, or first one found.
+     * If there are no books, default book will be created.
+     */
+    @Throws(IOException::class)
+    fun getTargetBook(context: Context): BookView {
+        val books = getBooks()
+
+        val defaultBookName = AppPreferences.shareNotebook(context)
+
+        if (books.isEmpty()) {
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "No existing books found, creating new \"$defaultBookName\" book")
+            return createBook(defaultBookName)
+
+        } else {
+            for (book in books) {
+                if (defaultBookName == book.book.name) {
+                    if (BuildConfig.LOG_DEBUG)
+                        LogUtils.d(TAG, "Found book that matches default book name \"$defaultBookName\"")
+                    return book
+                }
+            }
+
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "No existing books found to match default book name \"$defaultBookName\", using the first book")
+            return books.first()
+        }
+    }
+
+    fun getRootNode(bookId: Long): Note? {
+        return db.note().getRootNode(bookId)
+    }
+
+    fun setLink(bookId: Long, repo: Repo?) {
+        if (repo == null) {
+            deleteBookLink(bookId)
+        } else {
+            setBookLink(bookId, repo)
+        }
+    }
+
+    private fun setBookLink(bookId: Long, repo: Repo) {
+        val repoId = checkNotNull(db.repo().get(repo.url)) {
+            "Repo ${repo.url} not found"
+        }.id
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Ensure that the resulting file name is not ignored in this repo
+            val syncRepo = getRepoInstance(repo.id, repo.type, repo.url)
+            val bookName = getBook(bookId)!!.name
+            val repoRelativePath = BookName.repoRelativePath(bookName, BookFormat.ORG)
+            RepoUtils.ensurePathIsNotIgnored(syncRepo, repoRelativePath)
+        }
+
+        db.bookLink().upsert(bookId, repoId)
+    }
+
+    private fun deleteBookLink(bookId: Long) {
+        db.bookLink().deleteByBookId(bookId)
+    }
+
+    fun cycleVisibility(bookId: Long): Int {
+        if (unfoldedNotesExist(bookId)) {
+            foldAllNotes(bookId)
+        } else {
+            unFoldAllNotes(bookId)
+        }
+        return 0
+    }
+
+    private fun unfoldedNotesExist(bookId: Long): Boolean {
+        return db.note().getBookUnfoldedNoteCount(bookId) > 0
+    }
+
+    private fun unFoldAllNotes(bookId: Long) {
+        db.note().unfoldAll(bookId)
+    }
+
+    private fun foldAllNotes(bookId: Long) {
+        db.note().foldAll(bookId)
+    }
+
+    private fun unfoldForNote(noteId: Long) {
+        db.note().getNoteAndAncestorsIds(listOf(noteId)).let { ids ->
+            if (ids.isNotEmpty()) {
+                db.note().unfoldNotes(ids)
+                db.note().updateFoldedUnderForNoteFoldedUnderId(ids)
+            }
+        }
+    }
+
+    fun promoteNotes(ids: Set<Long>): Int {
+        return db.runInTransaction(Callable {
+            val note = db.note().getFirst(ids) ?: return@Callable 0
+
+            /* Can only promote notes of level 2 or greater. */
+            if (note.position.level <= 1 || note.position.parentId <= 0) {
+                return@Callable 0
+            }
+
+            // Paste just under parent if note's level is too high, below otherwise
+            val parent = db.note().get(note.position.parentId) ?: return@Callable 0
+            val count = if (parent.position.level + 1 < note.position.level) {
+                moveSubtrees(ids, Place.UNDER_AS_FIRST, note.position.parentId)
+            } else {
+                moveSubtrees(ids, Place.BELOW, note.position.parentId)
+            }
+
+            return@Callable count
+        })
+    }
+
+    fun demoteNotes(ids: Set<Long>): Int {
+        return db.runInTransaction(Callable {
+            val note = db.note().getFirst(ids) ?: return@Callable 0
+
+            val previousSibling = db.note().getPreviousSibling(
+                    note.position.bookId, note.position.lft, note.position.parentId)
+
+            if (previousSibling != null) {
+                return@Callable moveSubtrees(ids, Place.UNDER, previousSibling.id)
+            } else {
+                return@Callable 0
+            }
+        })
+    }
+
+    fun moveNote(bookId: Long, noteIds: Set<Long>, direction: Int): Int {
+        return db.runInTransaction(Callable {
+            val target: NotePlace? =
+                    if (direction == -1) { // Move up
+                        db.note().getFirst(noteIds)?.let { note ->
+                            db.note().getPreviousSibling(bookId, note.position.lft, note.position.parentId)?.let { sibling ->
+                                if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Place above ${sibling.title}")
+                                NotePlace(bookId, sibling.id, Place.ABOVE)
+                            }
+                        }
+                    } else { // Move down
+                        db.note().getLast(noteIds)?.let { note ->
+                            db.note().getNextSibling(bookId, note.position.rgt, note.position.parentId)?.let { sibling ->
+                                if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Place below ${sibling.title}")
+                                NotePlace(bookId, sibling.id, Place.BELOW)
+                            }
+                        }
+                    }
+
+            target?.let {
+                return@Callable moveSubtrees(noteIds, it.place, it.noteId)
+            }
+
+            return@Callable 0
+        })
+    }
+
+    fun refileNotes(noteIds: Set<Long>, target: NotePlace) {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Refiling ${noteIds.size} notes to $target")
+
+        if (target.noteId == 0L) { // To book
+            val root = getRootNode(target.bookId) ?: return
+
+            db.runInTransaction(Callable {
+                moveSubtrees(noteIds, Place.UNDER, root.id)
+            })
+
+        } else {
+            db.runInTransaction(Callable {
+                moveSubtrees(noteIds, target.place, target.noteId)
+            })
+        }
+    }
+
+    fun pasteNotes(clipboard: NotesClipboard, bookId: Long, noteId: Long, place: Place): Int {
+        return db.runInTransaction(Callable {
+            pasteNotesClipboard(clipboard, bookId, place, noteId)
+        })
+    }
+
+    private fun pasteNotesClipboard(
+            clipboard: NotesClipboard,
+            bookId: Long,
+            place: Place,
+            targetNoteId: Long): Int {
+
+        val pastedNoteIds = mutableSetOf<Long>()
+
+        // Empty book, use root node
+        val targetNote = if (targetNoteId == 0L) {
+            db.note().getRootNode(bookId)
+        } else {
+            db.note().get(targetNoteId)
+        } ?: return 0
+
+        val targetPosition = TargetPosition.getInstance(db, targetNote, place)
+
+        val levelOffset = targetPosition.level - 1
+
+        if (BuildConfig.LOG_DEBUG)
+            LogUtils.d(TAG, """
+                Pasting ${clipboard.count} notes $place ${targetNote.title}
+
+                targetLft: ${targetNote.position.lft}
+                targetRgt: ${targetNote.position.rgt}
+                targetLevel: ${targetNote.position.level}
+
+                targetPosition: $targetPosition
+
+                levelOffset: $levelOffset
+
+                Clipboard entries: ${clipboard.entries}
+                """.trimIndent())
+
+        makeSpaceForNewNotes(clipboard.count, targetNote, place)
+
+        var lastNoteId = 0L
+        val parentIds = ArrayDeque<Long>().apply {
+            add(targetPosition.parentId)
+        }
+        val idsMap = mutableMapOf<Long, Long>()
+
+        for (entry in clipboard.entries) {
+            val level = levelOffset + entry.note.position.level
+
+            val lft = targetPosition.lft + entry.note.position.lft - 1
+            val rgt = targetPosition.lft + entry.note.position.rgt - 1
+
+            val foldedUnderId = idsMap[entry.note.position.foldedUnderId]
+                    ?: if (targetPosition.foldedUnder != 0L) targetPosition.foldedUnder else 0
+
+            while (lastNoteId != 0L && entry.note.position.level > parentIds.size) {
+                parentIds.addLast(lastNoteId)
+            }
+
+            while (parentIds.size > 0 && entry.note.position.level < parentIds.size) {
+                parentIds.removeLast()
+            }
+
+            val note = entry.note.copy(
+                    id = 0,
+                    position = entry.note.position.copy(
+                            bookId = targetNote.position.bookId,
+                            lft = lft,
+                            rgt = rgt,
+                            level = level,
+                            parentId = parentIds.peekLast() ?: 0,
+                            foldedUnderId = foldedUnderId
+                    )
+            )
+
+            lastNoteId = db.note().insert(note)
+
+            val properties = OrgProperties().apply {
+                entry.properties.forEach {
+                    put(it.name, it.value)
+                }
+            }
+
+            insertNoteProperties(lastNoteId, properties)
+            insertNoteEvents(lastNoteId, note.title, note.content, properties)
+
+            idsMap[entry.note.id] = lastNoteId
+
+            pastedNoteIds.add(lastNoteId)
+
+            if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Inserted $lastNoteId $note")
+        }
+
+        db.noteAncestor().insertAncestorsForNotes(pastedNoteIds)
+
+        // Update descendants count for the target note and its ancestors
+        db.note().updateDescendantsCountForNoteAndAncestors(listOf(targetNote.id))
+
+        unfoldTargetIfMovingUnder(place, targetNote.id)
+
+        updateBookIsModified(targetNote.position.bookId, true)
+
+        // Refresh title cookies/states of the parent task that gained the pasted notes
+        if (targetPosition.parentId > 0) {
+            updateNoteAndAncestorsAfterChange(targetPosition.parentId)
+        }
+
+        return pastedNoteIds.size
+    }
+
+    data class NoteWithPosition(val note: Note, val level: Int, val lft: Long, val rgt: Long)
+
+    fun getSubtreesAligned(ids: Set<Long>): List<Note> {
+        var subtreeRgt = 0L
+        var levelOffset = 0
+
+        var sequence = 0L
+        var prevLevel = 0
+
+        val stack = Stack<NoteWithPosition>()
+
+        val notesPerLft = TreeMap<Long, Note>()
+
+        fun output(note: Note, level: Int, lft: Long, rgt: Long) {
+            notesPerLft[lft] = note.copy(
+                    position = note.position.copy(level = level, lft = lft, rgt = rgt))
+        }
+
+        var notes = 0
+
+        db.note().getNotesForSubtrees(ids).forEach { note ->
+            notes++
+
+            // First note or next subtree
+            if (subtreeRgt == 0L || note.position.rgt > subtreeRgt) {
+                subtreeRgt = note.position.rgt
+                levelOffset = note.position.level - 1
+
+                while (!stack.empty()) {
+                    val popped = stack.pop()
+
+                    sequence++
+
+                    output(popped.note, popped.level, popped.lft, sequence)
+                }
+
+                prevLevel = 0
+            }
+
+            val level = note.position.level - levelOffset
+
+            if (prevLevel < level) {
+                sequence++
+
+                val lft = sequence
+                val rgt = 0L // Unknown yet
+
+                stack.push(NoteWithPosition(note, level, lft, rgt))
+
+            } else if (prevLevel == level) {
+                sequence++
+
+                val popped = stack.pop()
+
+                output(popped.note, popped.level, popped.lft, sequence)
+
+                sequence++
+
+                val lft = sequence
+                val rgt = 0L // Unknown yet
+
+                stack.push(NoteWithPosition(note, level, lft, rgt))
+
+            } else {
+                while (!stack.empty()) {
+                    val popped = stack.peek()
+
+                    if (popped.level >= level) {
+                        stack.pop()
+
+                        sequence++
+
+                        output(popped.note, popped.level, popped.lft, sequence)
+
+                    } else {
+                        break
+                    }
+                }
+
+                sequence++
+
+                val lft = sequence
+                val rgt = 0L // Unknown yet
+
+                stack.push(NoteWithPosition(note, level, lft, rgt))
+            }
+
+            prevLevel = level
+        }
+
+        while (!stack.empty()) {
+            val popped = stack.pop()
+
+            sequence++
+
+            output(popped.note, popped.level, popped.lft, sequence)
+        }
+
+        return notesPerLft.values.toList()
+    }
+
+    private fun moveSubtrees(selectedIds: Set<Long>, place: Place, targetNoteId: Long): Int {
+        val targetNote = db.note().get(targetNoteId) ?: return 0
+
+        val targetPosition = TargetPosition.getInstance(db, targetNote, place)
+
+        val alignedNotes = getSubtreesAligned(selectedIds)
+
+        // Parents of the moved notes, to be refreshed after the move
+        val oldParentIds = selectedIds
+                .mapNotNull { id -> db.note().getAncestors(id).lastOrNull()?.id }
+
+        // Update descendant count for ancestors before move, not counting moved notes themselves
+        db.note().updateDescendantsCountForAncestors(selectedIds, selectedIds)
+
+        db.noteAncestor().deleteForSubtrees(selectedIds)
+
+        makeSpaceForNewNotes(alignedNotes.size, targetNote, place)
+
+
+        val ids = mutableSetOf<Long>()
+        val sourceBookIds = mutableSetOf<Long>()
+
+        // Update notes
+        alignedNotes.map { note ->
+            db.note().updateNote(
+                    note.id,
+                    targetNote.position.bookId,
+                    targetPosition.level + note.position.level - 1,
+                    targetPosition.lft + note.position.lft - 1,
+                    targetPosition.lft + note.position.rgt - 1,
+                    // Set parent ID for top-level notes
+                    if (note.position.level == 1) {
+                        targetPosition.parentId
+                    } else {
+                        (note.position.parentId)
+                    })
+
+            // Collect new note IDs and source book IDs
+            ids.add(note.id)
+            sourceBookIds.add(note.position.bookId)
+        }
+
+        // Update note ancestors table
+        db.noteAncestor().insertAncestorsForNotes(ids)
+
+        db.note().updateDescendantsCountForAncestors(selectedIds)
+
+        db.note().unfoldNotesFoldedUnderOthers(ids)
+        if (targetPosition.foldedUnder != 0L) {
+            db.note().foldUnfolded(ids, targetPosition.foldedUnder)
+        }
+
+        // Update descendants count for the note and its ancestors
+        db.note().updateDescendantsCountForNoteAndAncestors(listOf(targetNote.id))
+
+        unfoldTargetIfMovingUnder(place, targetNoteId)
+
+        System.currentTimeMillis().let {
+            updateBookIsModified(sourceBookIds, true, it)
+            updateBookIsModified(targetNote.position.bookId, true, it)
+        }
+
+        // Refresh title cookies/states of the affected parent tasks (old and new parents)
+        (oldParentIds + targetPosition.parentId)
+                .filter { it > 0 }
+                .toSet()
+                .forEach { parentId -> updateNoteAndAncestorsAfterChange(parentId) }
+
+        return alignedNotes.size
+    }
+
+    /** Unfold target note and its ancestors if subtree is moved under it. */
+    private fun unfoldTargetIfMovingUnder(place: Place, targetNoteId: Long) {
+        if (place == Place.UNDER || place == Place.UNDER_AS_FIRST) {
+            unfoldForNote(targetNoteId)
+        }
+    }
+
+    data class TargetPosition(
+            val lft: Long = 0,
+            val level: Int = 0,
+            val parentId: Long = 0,
+            val foldedUnder: Long = 0) {
+
+        companion object {
+            fun getInstance(db: OrgzlyDatabase, targetNote: Note, place: Place): TargetPosition {
+                val lft: Long
+                val level: Int
+                val parentId: Long
+
+                // If target note is hidden, hide under the same note
+                var foldedUnder: Long = 0
+                if (targetNote.position.foldedUnderId != 0L) {
+                    foldedUnder = targetNote.position.foldedUnderId
+                }
+
+                when (place) {
+                    Place.ABOVE -> {
+                        lft = targetNote.position.lft
+                        level = targetNote.position.level
+                        parentId = targetNote.position.parentId
+                    }
+
+                    Place.UNDER -> {
+                        val lastDescendant = db.note().getLastHighestLevelDescendant(
+                                targetNote.position.bookId, targetNote.position.lft, targetNote.position.rgt)
+
+                        if (BuildConfig.LOG_DEBUG)
+                            LogUtils.d(TAG, "lastDescendant: $lastDescendant")
+
+
+                        if (lastDescendant != null) {
+                            // Insert after last descendant with highest level
+                            lft = lastDescendant.position.rgt + 1
+                            level = lastDescendant.position.level
+
+                        } else {
+                            // Insert just under the target note
+                            lft = targetNote.position.lft + 1
+                            level = targetNote.position.level + 1
+                        }
+
+                        if (targetNote.position.isFolded) {
+                            foldedUnder = targetNote.id
+                        }
+
+                        parentId = targetNote.id
+                    }
+
+                    Place.UNDER_AS_FIRST -> {
+                        lft = targetNote.position.lft + 1
+                        level = targetNote.position.level + 1
+
+                        if (targetNote.position.isFolded) {
+                            foldedUnder = targetNote.id
+                        }
+
+                        parentId = targetNote.id
+                    }
+
+                    Place.BELOW -> {
+                        lft = targetNote.position.rgt + 1
+                        level = targetNote.position.level
+                        parentId = targetNote.position.parentId
+                    }
+
+                    else -> throw IllegalArgumentException("Unsupported place: $place")
+                }
+
+                return TargetPosition(lft, level, parentId, foldedUnder)
+            }
+        }
+    }
+
+    fun setNotesScheduledTime(noteIds: Set<Long>, time: OrgDateTime?) {
+        val timeId = if (time != null) getOrgRangeId(OrgRange(time)) else null
+
+        db.note().updateScheduledTime(noteIds, timeId)
+
+        db.note().get(noteIds).mapTo(hashSetOf()) { it.position.bookId }.let {
+            updateBookIsModified(it, true)
+        }
+        triggerCalendarSync()
+    }
+
+    fun setNotesDeadlineTime(noteIds: Set<Long>, time: OrgDateTime?) {
+        val timeId = if (time != null) getOrgRangeId(OrgRange(time)) else null
+
+        db.note().updateDeadlineTime(noteIds, timeId)
+
+        db.note().get(noteIds).mapTo(hashSetOf()) { it.position.bookId }.let {
+            updateBookIsModified(it, true)
+        }
+        triggerCalendarSync()
+    }
+
+    fun setNotesClockingState(noteIds: Set<Long>, type: Int) {
+        var contentUpdated = false
+
+        noteIds.forEach { noteId ->
+            val content = db.note().get(noteId)?.content
+
+            val newContent = when (type) {
+                0 -> OrgFormatter.clockIn(content)
+                1 -> OrgFormatter.clockOut(content)
+                2 -> OrgFormatter.clockCancel(content)
+                else -> content
+            }
+
+            if (newContent !== content) {
+                val contentLineCount = MiscUtils.lineCount(newContent)
+                db.note().updateContent(noteId, newContent, contentLineCount)
+                contentUpdated = true
+            }
+        }
+
+        if (contentUpdated) {
+            db.note().get(noteIds).mapTo(hashSetOf()) { it.position.bookId }.let {
+                updateBookIsModified(it, true)
+            }
+        }
+    }
+
+    fun toggleNoteFoldedState(noteId: Long): Int {
+        return db.runInTransaction(Callable {
+            val note = db.note().get(noteId) ?: return@Callable 0
+
+            val toggled = db.note().updateIsFolded(note.id, !note.position.isFolded)
+
+            if (note.position.isFolded) {
+                db.note().unfoldDescendantsUnderId(note.position.bookId, note.id, note.position.lft, note.position.rgt)
+            } else {
+                db.note().foldDescendantsUnderId(note.position.bookId, note.id, note.position.lft, note.position.rgt)
+            }
+
+            return@Callable toggled
+        })
+    }
+
+    fun toggleNoteFoldedStateForSubtree(noteId: Long) {
+        db.runInTransaction {
+            db.note().get(noteId)?.let { note ->
+                val foldedCount = db.note().getSubtreeFoldedNoteCount(listOf(noteId))
+
+                if (foldedCount == 0) { // All notes unfolded
+                    db.note().foldSubtrees(listOf(note.id))
+                } else {
+                    db.note().unfoldSubtrees(listOf(noteId))
+                }
+            }
+        }
+    }
+
+    fun setNoteStateToDone(noteId: Long): Int {
+        val firstDone = AppPreferences.getFirstDoneState(context) ?: return 0
+
+        return setNotesState(setOf(noteId), firstDone)
+    }
+
+    fun toggleNotesState(noteIds: Set<Long>): Int {
+        val firstTodo = AppPreferences.getFirstTodoState(context)
+        val firstDone = AppPreferences.getFirstDoneState(context)
+
+        if (firstTodo != null && firstDone != null) {
+            val allNotesAreDone = db.note().get(noteIds).firstOrNull { note ->
+                !AppPreferences.isDoneKeyword(context, note.state)
+            } == null
+
+            return if (allNotesAreDone) {
+                setNotesState(noteIds, firstTodo)
+            } else {
+                setNotesState(noteIds, firstDone)
+            }
+        }
+
+        return 0
+    }
+
+    fun setNotesState(noteIds: Set<Long>, state: String?): Int {
+        return db.runInTransaction(Callable {
+            /*
+             * Notebooks must be updated before notes,
+             * because this query checks for notes what will be affected.
+             */
+            updateBookIsModified(db.note().getBookIdsForNotesNotMatchingState(noteIds, state).toSet(), true)
+
+            return@Callable if (AppPreferences.isDoneKeyword(context, state)) {
+                var updated = 0
+
+                db.note().getNoteForStateChange(noteIds, state).forEach { note ->
+                    updated += updateSingleNoteToDoneWithinTransaction(note, state!!)
+
+                    // Parent task may need its state or [%] cookie updated.
+                    tryUpdateTitleCookiesOfParent(note.noteId)
+                }
+
+                updated
+
+            } else { // Set to non-done state
+                val ret = db.note().updateStateAndRemoveClosedTime(noteIds, state)
+
+                for (noteId in noteIds) {
+                    tryUpdateTitleCookiesOfParent(noteId)
+                }
+
+                ret
+            }
+        })
+    }
+
+    /**
+     * Applies a DONE state to a single note, including repeat/closed-time handling.
+     * Must be called within a DB transaction.
+     */
+    private fun updateSingleNoteToDoneWithinTransaction(
+            note: NoteDao.NoteForStateUpdate,
+            state: String): Int {
+
+        var title = note.title
+        var content = note.content
+
+        val eventsInNote = EventsInNote(title, content)
+
+        val scl = StateChangeLogic(AppPreferences.doneKeywordsSet(context))
+
+        scl.setState(
+                state,
+                note.state,
+                OrgRange.parseOrNull(note.scheduled),
+                OrgRange.parseOrNull(note.deadline),
+                eventsInNote.timestamps.map { OrgRange(it) })
+
+        if (scl.isShifted) {
+            eventsInNote.replaceEvents(scl.timestamps).apply {
+                title = first
+                content = second
+            }
+
+            val now = OrgDateTime(false).toString()
+
+            // Add last-repeat time
+            if (AppPreferences.setLastRepeatOnTimeShift(context)) {
+                setNoteProperty(note.noteId, OrgFormatter.LAST_REPEAT_PROPERTY, now)
+            }
+
+            // Log state change
+            if (AppPreferences.logOnTimeShift(context)) {
+                val logEntry = OrgFormatter.stateChangeLine(note.state, state, now)
+                content = OrgFormatter.insertLogbookEntryLine(content, logEntry)
+            }
+        }
+
+        val updated = db.note().update(
+                note.noteId,
+                title,
+                content,
+                MiscUtils.lineCount(content),
+                scl.state,
+                getOrgRangeId(scl.scheduled),
+                getOrgRangeId(scl.deadline),
+                getOrgRangeId(scl.closed))
+
+        if (scl.isShifted) {
+            replaceNoteEvents(note.noteId, title, content, null)
+        }
+
+        return updated
+    }
+
+    /**
+     * Changes a single note's state within the current transaction (used when a parent task is
+     * automatically transitioned because of its children).
+     */
+    private fun setNoteStateWithinTransaction(note: Note, state: String?): Int {
+        val updated = if (AppPreferences.isDoneKeyword(context, state)) {
+            val noteForStateChange =
+                    db.note().getNoteForStateChange(setOf(note.id), state!!).firstOrNull()
+                            ?: return 0
+
+            updateSingleNoteToDoneWithinTransaction(noteForStateChange, state)
+        } else {
+            db.note().updateStateAndRemoveClosedTime(setOf(note.id), state)
+        }
+
+        if (updated > 0) {
+            updateBookIsModified(note.position.bookId, true)
+        }
+
+        return updated
+    }
+
+    fun updateNoteContent(noteId: Long, content: String?) {
+        db.runInTransaction {
+            db.note().updateContent(noteId, content, MiscUtils.lineCount(content))
+
+            val note = db.note().get(noteId)!!
+
+            tryUpdateTitleCookies(note)
+
+            updateBookIsModified(note.position.bookId, true)
+        }
+    }
+
+    fun selectNotesFromQueryFlow(queryString: String): Flow<List<NoteView>> {
+        val parser = InternalQueryParser()
+
+        val query = parser.parse(queryString)
+
+        val sqlQuery = buildSqlQuery(query)
+
+        return db.noteView().runQueryFlow(sqlQuery)
+    }
+
+    fun selectNotesFromQuery(query: Query): List<NoteView> {
+        val sqlQuery = buildSqlQuery(query)
+
+        return db.noteView().runQuery(sqlQuery)
+    }
+
+    /** Tasks grouped for the "today" landing page. */
+    data class TodayTasks(
+        val overdue: List<NoteView>,
+        val dueToday: List<NoteView>,
+        val scheduledToday: List<NoteView>,
+        val repeatingToday: List<NoteView>,
+        val doneCount: Int,
+        val totalCount: Int,
+        val estimatedMinutes: Long,
+        val spentMinutes: Long
+    ) {
+        val all: List<NoteView> get() = overdue + dueToday + scheduledToday + repeatingToday
+    }
+
+    /**
+     * Aggregates tasks relevant for today from all notebooks:
+     * overdue, due today, scheduled today and repeating-today (each note in one group).
+     * Untimed TODO items are intentionally not included - this view is about *today*.
+     */
+    fun selectTodayTasks(): TodayTasks {
+        val done = AppPreferences.doneKeywordsSet(context)
+
+        fun isOpen(noteView: NoteView): Boolean =
+                noteView.note.state == null || !done.contains(noteView.note.state)
+
+        val rawDue = db.noteView().getDeadlineToday()
+        val rawScheduled = db.noteView().getScheduledToday()
+
+        val todayIds = HashSet<Long>()
+        (rawDue + rawScheduled).forEach { todayIds.add(it.note.id) }
+
+        val nowDone = (rawDue + rawScheduled).count { done.contains(it.note.state) }
+
+        // Overdue: both past deadlines and past scheduled start times (open tasks).
+        // Repeating tasks are handled by the "repeat" logic instead (which also applies an
+        // activity window), so they never pollute the overdue list.
+        val overdue = (
+                db.noteView().getDeadlineOverdue(startOfTodayMillis()) +
+                        db.noteView().getScheduledOverdue(startOfTodayMillis())
+                )
+                .filter { isOpen(it) && !hasRepeater(it) }
+                .distinctBy { it.note.id }
+                .sortedBy { it.deadlineTimeTimestamp ?: it.scheduledTimeTimestamp ?: Long.MAX_VALUE }
+
+        val seen = HashSet<Long>()
+
+        fun pick(candidates: List<NoteView>): List<NoteView> {
+            val result = ArrayList<NoteView>()
+            for (noteView in candidates) {
+                if (noteView.note.id in seen) continue
+                if (!isOpen(noteView)) continue
+                seen.add(noteView.note.id)
+                result.add(noteView)
+            }
+            return result
+        }
+
+        fun isRepeating(noteView: NoteView): Boolean {
+            val range = when {
+                noteView.scheduledRangeString != null -> noteView.scheduledRangeString
+                noteView.deadlineRangeString != null -> noteView.deadlineRangeString
+                else -> null
+            } ?: return false
+            return repeatsToday(range, startOfTodayMillis())
+        }
+
+        val dueOpen = pick(rawDue)
+        val scheduledOpen = pick(rawScheduled)
+
+        // Repeating tasks: scan all scheduled/deadline tasks and compute whether the next
+        // occurrence (base + repeater) lands on today, not just tasks timestamped today.
+        val repeating = ArrayList<NoteView>()
+        val repeatingIds = HashSet<Long>()
+
+        db.noteView().getAllWithScheduledOrDeadline().forEach { noteView ->
+            if (!isOpen(noteView)) return@forEach
+            if (isRepeating(noteView) && repeatingIds.add(noteView.note.id)) {
+                repeating.add(noteView)
+            }
+        }
+
+        val dueToday = dueOpen.filter { it.note.id !in repeatingIds }
+        val scheduledDay = scheduledOpen.filter { it.note.id !in repeatingIds }
+        val overdueFiltered = overdue.filter { it.note.id !in repeatingIds }
+
+        // Time stats (EFFORT + manual stopwatch) over all of today's relevant notes.
+        val statIds = HashSet<Long>(todayIds)
+        statIds.addAll(repeatingIds)
+        overdueFiltered.forEach { statIds.add(it.note.id) }
+
+        var estimated = 0L
+        var spent = 0L
+        db.noteProperty().getAll().forEach { property ->
+            if (property.noteId in statIds) {
+                when (property.name) {
+                    "EFFORT" -> estimated += parseEffortMinutes(property.value)
+                    CLOCKED_SECONDS_PROPERTY -> spent += (property.value.toLongOrNull() ?: 0L) / 60L
+                }
+            }
+        }
+
+        return TodayTasks(
+                overdue = overdueFiltered,
+                dueToday = dueToday,
+                scheduledToday = scheduledDay,
+                repeatingToday = repeating,
+                doneCount = nowDone,
+                totalCount = (todayIds + repeatingIds).size,
+                estimatedMinutes = estimated,
+                spentMinutes = spent
+        )
+    }
+
+    /** True when the repeater's next occurrence (from the range's start date) falls on today. */
+    private fun repeatsToday(rangeString: String, todayMillis: Long): Boolean {
+        val range = OrgRange.parseOrNull(rangeString) ?: return false
+        val start = range.startTime ?: return false
+        val repeater = start.getRepeater() ?: return false
+
+        val base = Calendar.getInstance().apply {
+            timeInMillis = start.calendar.timeInMillis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val today = Calendar.getInstance().apply {
+            timeInMillis = todayMillis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        if (base.after(today)) return false
+
+        // Only consider repeats whose base date is still "active" (within the last year).
+        val activeFrom = today.clone() as Calendar
+        activeFrom.add(Calendar.DAY_OF_YEAR, -REPEAT_ACTIVE_DAYS)
+        if (base.before(activeFrom)) return false
+
+        if (base.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                base.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {
+            return true
+        }
+
+        val value = repeater.value.coerceAtLeast(1)
+        val diffDays = ((today.timeInMillis - base.timeInMillis) / (24L * 60 * 60 * 1000)).toInt()
+
+        return when (repeater.unit) {
+            com.orgzly.org.datetime.OrgInterval.Unit.HOUR -> true
+            com.orgzly.org.datetime.OrgInterval.Unit.DAY -> diffDays % value == 0
+            com.orgzly.org.datetime.OrgInterval.Unit.WEEK -> diffDays % (7 * value) == 0
+            com.orgzly.org.datetime.OrgInterval.Unit.MONTH ->
+                monthDiff(base, today) % value == 0 &&
+                        base.get(Calendar.DAY_OF_MONTH) == today.get(Calendar.DAY_OF_MONTH)
+            com.orgzly.org.datetime.OrgInterval.Unit.YEAR ->
+                (today.get(Calendar.YEAR) - base.get(Calendar.YEAR)) % value == 0 &&
+                        base.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+            else -> false
+        }
+    }
+
+    private fun monthDiff(from: Calendar, to: Calendar): Int =
+            (to.get(Calendar.YEAR) - from.get(Calendar.YEAR)) * 12 +
+                    (to.get(Calendar.MONTH) - from.get(Calendar.MONTH))
+
+    /** True when the note's scheduled/deadline range carries an org repeater. */
+    private fun hasRepeater(noteView: NoteView): Boolean {
+        val rangeString = noteView.scheduledRangeString ?: noteView.deadlineRangeString ?: return false
+        return OrgRange.parseOrNull(rangeString)?.startTime?.getRepeater() != null
+    }
+
+    /** Parses an EFFORT value such as "2h", "1.5h", "90m" into minutes. */
+    private fun parseEffortMinutes(value: String?): Long {
+        if (value.isNullOrBlank()) return 0L
+
+        var total = 0L
+        val token = Regex("([0-9]+(?:\\.[0-9]+)?)\\s*(h|m)", RegexOption.IGNORE_CASE)
+
+        for (match in token.findAll(value)) {
+            val amount = match.groupValues[1].toDouble()
+            val unit = match.groupValues[2].lowercase()
+
+            total += if (unit == "h") {
+                kotlin.math.round(amount * 60).toLong()
+            } else {
+                amount.toLong()
+            }
+        }
+
+        return total
+    }
+
+    private fun startOfTodayMillis(): Long {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        return calendar.timeInMillis
+    }
+
+    private fun buildSqlQuery(query: Query): SupportSQLiteQuery {
+        val queryBuilder = SqliteQueryBuilder(context)
+
+        val (selection, selectionArgs, having, orderBy) = queryBuilder.build(query)
+
+        val s = mutableListOf<String>()
+
+        if (query.condition != null) {
+            s.add(selection)
+        }
+
+        if (query.options.agendaDays > 0) {
+            s.add("((scheduled_range_id IS NOT NULL AND scheduled_is_active = 1) OR (deadline_range_id IS NOT NULL AND deadline_is_active = 1) OR event_timestamp IS NOT NULL)")
+        }
+
+        if (!s.isEmpty() || !query.sortOrders.isEmpty()) {
+            s.add(NoteDao.WHERE_EXISTING_NOTES)
+        }
+
+        val selection2 = if (s.isEmpty()) "0" else TextUtils.join(" AND ", s)
+
+        // For agenda, group by event timestamp too
+        val groupBy = if (query.isAgenda()) {
+            "id, event_timestamp"
+        } else {
+            "id"
+        }
+
+        val supportQuery = SupportSQLiteQueryBuilder
+                .builder("(${NoteViewDao.QUERY_WITH_NOTE_EVENTS})")
+                .selection(selection2, selectionArgs.toTypedArray())
+                .groupBy(groupBy)
+                .having(having)
+                .orderBy(orderBy)
+                .create()
+
+        if (BuildConfig.LOG_DEBUG)
+            LogUtils.d(TAG, "Selecting notes using query $query "
+                    + "with selection args $selectionArgs\n${supportQuery.sql}")
+
+        return supportQuery
+    }
+
+    fun getNotes(bookName: String): List<NoteView> {
+        return db.noteView().getBookNotes(bookName)
+    }
+
+    fun getNotesWithScheduledOrDeadline(): List<NoteView> {
+        return db.noteView().getAllWithScheduledOrDeadline()
+    }
+
+    fun getVisibleNotesLiveData(bookId: Long, noteId: Long? = null): LiveData<List<NoteView>> {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "bookId=$bookId, noteId=$noteId")
+
+        return if (noteId != null) {
+            db.noteView().getVisibleLiveDataNarrowed(bookId, noteId)
+        } else {
+            db.noteView().getVisibleLiveData(bookId)
+        }
+    }
+
+    fun getNoteCount(bookId: Long): Int {
+        return db.note().getCount(bookId)
+    }
+
+    fun getNotePayload(noteId: Long): NotePayload? {
+        val noteView = getNoteView(noteId)
+
+        if (noteView != null) {
+            val properties = getNoteProperties(noteId)
+
+            return NoteBuilder.newPayload(noteView, properties)
+        }
+
+        return null
+    }
+
+    fun getNoteView(id: Long): NoteView? {
+        return db.noteView().get(id)
+    }
+
+    fun getLastNoteView(title: String): NoteView? {
+        return db.noteView().getLast(title)
+    }
+
+    fun getLastNote(title: String): Note? {
+        return db.note().getLast(title)
+    }
+
+    fun getNote(noteId: Long): Note? {
+        return db.note().get(noteId)
+    }
+
+    fun getNotesByTitle(title: String): List<Note> {
+        return db.note().getByTitle(title)
+    }
+
+    fun getFirstNote(noteIds: Set<Long>): Note? {
+        return db.note().getFirst(noteIds)
+    }
+
+    fun getTopLevelNotes(bookId: Long): List<Note> {
+        return db.note().getTopLevel(bookId)
+    }
+
+    fun getNoteAncestors(noteId: Long): List<Note> {
+        return db.note().getAncestors(noteId)
+    }
+
+    fun getNoteAndAncestors(noteId: Long): List<Note> {
+        return db.note().getNoteAndAncestors(noteId)
+    }
+
+    fun getNoteAtPath(fullPath: String): NoteView? {
+        val (bookName, path) = run {
+            val pathParts = fullPath.split("/")
+            if (pathParts.isEmpty()) return null
+            pathParts[0] to pathParts.drop(1).joinToString("/")
+        }
+        return if (path.split("/").any { it.isNotEmpty() })
+            getNotes(bookName)
+                    .filter { ("/$path").endsWith("/" + it.note.title) }
+                    .firstOrNull { view ->
+                        getNoteAndAncestors(view.note.id)
+                                .joinToString("/") { it.title } == path
+                    }
+        else null
+    }
+
+    fun getNotesAndSubtrees(ids: Set<Long>): List<Note> {
+        return db.note().getNotesForSubtrees(ids)
+    }
+
+    fun getNotesAndSubtreesCount(ids: Set<Long>): Int {
+        return db.note().getNotesForSubtreesCount(ids)
+    }
+
+    fun getNoteChildren(id: Long): List<Note> {
+        return db.note().getChildren(id)
+    }
+
+    fun getNoteProperties(noteId: Long): List<NoteProperty> {
+        return db.noteProperty().get(noteId)
+    }
+
+    /**
+     * Starts or stops the manual stopwatch for a note.
+     *
+     * While running, CLOCK_START holds the epoch-millis start time; CLOCKED_SECONDS holds the
+     * accumulated completed seconds. Elapsed time is always derived from the wall clock, so
+     * screen-off or a killed process still counts correctly when re-opened.
+     *
+     * @return Pair(running, totalSecondsAfterToggle)
+     */
+    fun toggleClock(noteId: Long): Pair<Boolean, Long> {
+        return db.runInTransaction(Callable {
+            val now = System.currentTimeMillis()
+
+            val properties = db.noteProperty().get(noteId)
+            val startMillis = properties
+                    .firstOrNull { it.name == CLOCK_START_PROPERTY }
+                    ?.value
+                    ?.toLongOrNull()
+            val accumulatedSeconds = properties
+                    .firstOrNull { it.name == CLOCKED_SECONDS_PROPERTY }
+                    ?.value
+                    ?.toLongOrNull()
+                    ?: 0L
+
+            val running: Boolean
+            val totalSeconds: Long
+
+            if (startMillis != null) {
+                // Stop: fold the elapsed time into the accumulated total.
+                val elapsedSeconds = ((now - startMillis) / 1000).coerceAtLeast(0L)
+                totalSeconds = accumulatedSeconds + elapsedSeconds
+                running = false
+
+                setNoteProperty(noteId, CLOCKED_SECONDS_PROPERTY, totalSeconds.toString())
+                db.noteProperty().delete(noteId, CLOCK_START_PROPERTY)
+
+            } else {
+                // Start.
+                totalSeconds = accumulatedSeconds
+                running = true
+
+                setNoteProperty(noteId, CLOCK_START_PROPERTY, now.toString())
+            }
+
+            db.note().get(noteId)?.position?.bookId?.let { bookId ->
+                updateBookIsModified(bookId, true)
+                refreshClockAggregates(bookId)
+            }
+
+            running to totalSeconds
+        })
+    }
+
+    /** Convenience for the UI: does the stopwatch for this note run right now? */
+    fun isClockRunning(noteId: Long): Boolean {
+        return db.noteProperty().get(noteId, CLOCK_START_PROPERTY).isNotEmpty()
+    }
+
+    /** Outline accent color of a top-level note, or null when not set. */
+    fun getOutlineColor(noteId: Long): Int? {
+        val value = db.noteProperty().get(noteId, OUTLINE_COLOR_PROPERTY).firstOrNull()?.value
+                ?: return null
+        return try {
+            android.graphics.Color.parseColor(value)
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+    }
+
+    /** Sets (or clears, when null) the outline accent color of a top-level note. */
+    fun setOutlineColor(noteId: Long, color: Int?) {
+        db.runInTransaction {
+            if (color == null) {
+                db.noteProperty().delete(noteId, OUTLINE_COLOR_PROPERTY)
+            } else {
+                setNoteProperty(noteId, OUTLINE_COLOR_PROPERTY, String.format("#%06X", 0xFFFFFF and color))
+            }
+            db.note().get(noteId)?.position?.bookId?.let { updateBookIsModified(it, true) }
+        }
+    }
+
+    /**
+     * Lightweight, read-only warm-up of the in-memory stopwatch subtree totals for a book.
+     * Run at app foreground (and lazily when a book is opened) so opening a notebook doesn't
+     * have to compute anything.
+     */
+    fun prewarmClockForBook(bookId: Long) {
+        if (ClockAggregates.has(bookId)) return
+        db.runInTransaction(Callable {
+            refreshClockAggregates(bookId)
+        })
+    }
+
+    /**
+     * Computes, once per book, the subtree stopwatch totals (note + all descendants) and caches
+     * them in memory, so list rendering never runs the aggregation inside per-row SQL.
+     */
+    private fun refreshClockAggregates(bookId: Long) {
+        val notes = db.note().getAllNotesInBook(bookId)
+
+        if (notes.isEmpty()) {
+            ClockAggregates.put(bookId, emptyMap())
+            return
+        }
+
+        val noteIds = notes.map { it.id }.toSet()
+        val own = HashMap<Long, Long>()
+
+        db.noteProperty().getAll().forEach { property ->
+            if (property.name == CLOCKED_SECONDS_PROPERTY && property.noteId in noteIds) {
+                own[property.noteId] = property.value.toLongOrNull() ?: 0L
+            }
+        }
+
+        val childrenByParent = notes.groupBy { it.position.parentId }
+        val totals = HashMap<Long, Long>()
+
+        for (note in notes.asReversed()) {
+            var total = own[note.id] ?: 0L
+            for (child in childrenByParent[note.id].orEmpty()) {
+                total += totals[child.id] ?: 0L
+            }
+            totals[note.id] = total
+        }
+
+        ClockAggregates.put(bookId, totals)
+    }
+
+    // ------------------------------------------------------------------
+    // AI "polish" support: serialise a note subtree to Org text and rebuild it.
+    // ------------------------------------------------------------------
+
+    private data class OrgOutlineEntry(val level: Int, val state: String?, val title: String, val content: String?)
+
+    /** Serialises the note and all its descendants as an Org outline (relative levels). */
+    fun exportNoteSubtreeAsOrg(noteId: Long): String {
+        val notes = db.note().getNotesForSubtrees(setOf(noteId))
+        val root = notes.firstOrNull { it.id == noteId } ?: return ""
+        val baseLevel = root.position.level
+
+        val sb = StringBuilder()
+
+        for (note in notes) {
+            val depth = note.position.level - baseLevel + 1
+
+            sb.append("*".repeat(depth))
+            if (!note.state.isNullOrEmpty()) {
+                sb.append(' ').append(note.state)
+            }
+            sb.append(' ').append(note.title.trimEnd())
+            sb.append('\n')
+
+            if (!note.content.isNullOrEmpty()) {
+                sb.append(note.content.trimEnd('\n')).append('\n')
+            }
+            sb.append('\n')
+        }
+
+        return sb.toString()
+    }
+
+    /**
+     * Replaces the note (with its whole subtree) by the given Org outline text. The outline
+     * must contain exactly one top-level ('*') heading, which becomes the replacement note.
+     *
+     * @return number of inserted notes
+     */
+    fun replaceNoteSubtreeFromOrg(noteId: Long, orgText: String): Int {
+        val entries = parseOrgOutline(orgText)
+
+        if (entries.isEmpty()) {
+            throw IllegalArgumentException("AI 返回为空")
+        }
+        if (entries.first().level != 1) {
+            throw IllegalArgumentException("AI 返回必须以一个顶层标题开始")
+        }
+        if (entries.count { it.level == 1 } != 1) {
+            throw IllegalArgumentException("AI 返回了多个顶层标题")
+        }
+
+        return db.runInTransaction(Callable {
+            val rootNote = db.note().get(noteId) ?: return@Callable 0
+            val bookId = rootNote.position.bookId
+            val oldParentId = rootNote.position.parentId
+
+            // Delete the whole old subtree (without using deleteNotes to avoid a nested transaction).
+            db.noteAncestor().deleteForSubtrees(setOf(noteId))
+            db.note().updateDescendantsCountForAncestors(setOf(noteId), setOf(noteId))
+            db.note().deleteById(setOf(noteId))
+
+            // Rebuild depth-first; createNote(UNDER) appends after the last descendant, which
+            // keeps pre-order (DFS) ordering when building top-down.
+            val stack = HashMap<Int, Long>() // outline level -> created note id
+            var inserted = 0
+
+            for (entry in entries) {
+                val parentForInsert: Long = if (entry.level == 1) {
+                    oldParentId
+                } else {
+                    stack[entry.level - 1] ?: throw IllegalArgumentException("大纲层级不连续")
+                }
+
+                val note = createNote(
+                        NotePayload(title = entry.title.trim(), content = entry.content, state = entry.state),
+                        NotePlace(bookId, parentForInsert, Place.UNDER),
+                        System.currentTimeMillis())
+
+                stack[entry.level] = note.id
+                val iterator = stack.keys.iterator()
+                while (iterator.hasNext()) {
+                    if (iterator.next() > entry.level) iterator.remove()
+                }
+
+                inserted++
+            }
+
+            inserted
+        })
+    }
+
+    /** Parses '*' - indented Org text into flat outline entries (level, optional state, title, body). */
+    private fun parseOrgOutline(orgText: String): List<OrgOutlineEntry> {
+        val todoKeywords = AppPreferences.todoKeywordsSet(context)
+        val doneKeywords = AppPreferences.doneKeywordsSet(context)
+        val keywords = todoKeywords + doneKeywords
+
+        val result = ArrayList<OrgOutlineEntry>()
+        var currentLevel = 0
+        var currentState: String? = null
+        var currentTitle: String? = null
+        val body = StringBuilder()
+
+        fun flush() {
+            if (currentTitle != null) {
+                result.add(OrgOutlineEntry(
+                        currentLevel,
+                        currentState,
+                        currentTitle ?: "",
+                        body.toString().trim('\n').ifEmpty { null }))
+            }
+            currentState = null
+            currentTitle = null
+            body.setLength(0)
+        }
+
+        for (line in orgText.lineSequence()) {
+            if (line.startsWith("*")) {
+                flush()
+
+                val level = line.takeWhile { it == '*' }.length
+                currentLevel = level
+
+                var rest = line.drop(level).trim()
+                val firstWord = rest.substringBefore(' ').trim()
+                if (keywords.contains(firstWord)) {
+                    currentState = firstWord
+                    rest = rest.substring(firstWord.length).trim()
+                }
+                currentTitle = rest
+
+            } else {
+                body.append(line).append('\n')
+            }
+        }
+        flush()
+
+        return result
+    }
+
+    fun getNotePropertyNames(): List<String> {
+        return (PropertyUtils.DEFAULT_PROPERTIES + db.noteProperty().allDistinctNames())
+            .map { it.trim('+') } // Drop "+" property modifiers
+            .distinctBy { it.lowercase() }
+    }
+
+    private fun setNoteProperty(noteId: Long, name: String, value: String) {
+        db.noteProperty().upsert(noteId, name, value)
+    }
+
+    private fun replaceNoteProperties(noteId: Long, properties: OrgProperties) {
+        db.noteProperty().delete(noteId)
+
+        insertNoteProperties(noteId, properties)
+    }
+
+    fun insertNoteProperties(noteId: Long, properties: OrgProperties) {
+        var position = 1
+
+        properties.all.forEach { property ->
+            NoteProperty(noteId, position++, property.name, property.value).let {
+                db.noteProperty().insert(it)
+            }
+        }
+    }
+
+    private fun setNoteCreatedAtTime(noteId: Long, time: Long) {
+        db.note().updateCreatedAtTime(noteId, time)
+    }
+
+    fun createNoteFromNotification(title: String) {
+        val book = getTargetBook(context)
+
+        val notePayload = NoteBuilder.newPayload(context, title, "")
+
+        createNote(notePayload, NotePlace(book.book.id))
+    }
+
+    /**
+     * Creates new note adding created-at time to it.
+     */
+    fun createNote(notePayload: NotePayload, target: NotePlace): Note {
+        val createdAt = System.currentTimeMillis()
+
+        val payload = if (AppPreferences.createdAt(context)) {
+            // Set created-at property
+
+            val propName = AppPreferences.createdAtProperty(context)
+            val propValue = OrgDateTime(createdAt, false).toString()
+
+            val properties = notePayload.properties.apply {
+                put(propName, propValue)
+            }
+
+            notePayload.copy(properties = properties)
+
+        } else {
+            notePayload
+        }
+
+        return db.runInTransaction(Callable {
+            createNote(payload, target, createdAt)
+        })
+    }
+
+    private fun createNote(notePayload: NotePayload, target: NotePlace, time: Long): Note {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, notePayload, target, time)
+
+        var targetNote = if (target.place != Place.UNSPECIFIED) {
+            db.note().get(target.noteId) ?: throw IOException("Target note not found")
+        } else {
+            null
+        }
+
+        /* Set place to ABOVE if prepend is enabled in settings and book is not empty */
+        if (target.place == Place.UNSPECIFIED && AppPreferences.isNewNotePrepend(context)) {
+            targetNote = db.note().getFirstNoteInBook(target.bookId)
+            if (targetNote != null) {
+                target.place = Place.ABOVE
+            }
+        }
+
+        val newNotePosition = when (target.place) {
+            Place.ABOVE -> {
+                if (targetNote == null) {
+                    throw IOException("Target note not found")
+                }
+
+                NotePosition(
+                        bookId = target.bookId,
+                        lft = targetNote.position.lft,
+                        rgt = targetNote.position.lft + 1,
+                        level = targetNote.position.level,
+                        parentId = targetNote.position.parentId)
+            }
+
+            Place.BELOW -> {
+                if (targetNote == null) {
+                    throw IOException("Target note not found")
+                }
+
+                NotePosition(
+                        bookId = target.bookId,
+                        lft = targetNote.position.rgt + 1,
+                        rgt = targetNote.position.rgt + 2,
+                        level = targetNote.position.level,
+                        parentId = targetNote.position.parentId
+                )
+            }
+
+            Place.UNDER -> {
+                if (targetNote == null) {
+                    throw IOException("Target note not found")
+                }
+
+                NotePosition(
+                        bookId = target.bookId,
+                        lft = targetNote.position.rgt,
+                        rgt = targetNote.position.rgt + 1,
+                        level = targetNote.position.level + 1,
+                        parentId = targetNote.id,
+                        foldedUnderId = if (targetNote.position.isFolded) targetNote.id else 0
+                )
+            }
+
+            Place.UNDER_AS_FIRST -> {
+                TODO("Insert UNDER_AS_FIRST not implemented")
+            }
+
+            Place.UNSPECIFIED -> {
+                /* If target note is not used, add note at the end with level 1. */
+                val rootRgt = db.note().getMaxRgtForBook(target.bookId) ?: 0
+                val rootId = db.note().getRootNodeId(target.bookId) ?: 0
+
+                NotePosition(
+                        bookId = target.bookId,
+                        lft = rootRgt,
+                        rgt = rootRgt + 1,
+                        level = 1,
+                        parentId = rootId
+                )
+            }
+        }
+
+        // Make space for new note
+        if (target.place != Place.UNSPECIFIED) {
+            makeSpaceForNewNotes(1, targetNote!!, target.place)
+
+            val count = db.note().incrementDescendantsCountForAncestors(
+                    target.bookId, newNotePosition.lft, newNotePosition.rgt)
+
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "Updated descendants_count for $count notes (${target.bookId}, ${newNotePosition.lft}, ${newNotePosition.rgt})")
+
+        }
+        db.note().incrementRgtForRootNote(target.bookId)
+
+        val noteEntity = Note(
+                0,
+                0,
+                time,
+                notePayload.title,
+                Tags(notePayload.tags),
+                notePayload.state,
+                notePayload.priority,
+                notePayload.content,
+                MiscUtils.lineCount(notePayload.content),
+                getOrgRangeId(notePayload.scheduled),
+                getOrgRangeId(notePayload.deadline),
+                getOrgRangeId(notePayload.closed),
+                null,
+                newNotePosition)
+
+
+        val noteId = db.note().insert(noteEntity)
+
+        replaceNoteProperties(noteId, notePayload.properties)
+        replaceNoteEvents(noteId, notePayload.title, notePayload.content, notePayload.properties)
+
+        db.noteAncestor().insertAncestorsForNote(noteId)
+
+        tryUpdateTitleCookiesOfParent(noteId)
+
+        tryUpdateTitleCookies(noteEntity.copy(id = noteId))
+
+        updateBookIsModified(target.bookId, true, time)
+
+        triggerCalendarSync()
+
+        return noteEntity.copy(id = noteId)
+    }
+
+    /**
+     * Increment notes' lft and rgt to make space for new notes.
+     */
+    private fun makeSpaceForNewNotes(numberOfNotes: Int, targetNote: Note, place: Place) {
+        val spaceRequired = numberOfNotes * 2
+
+        val bookId = targetNote.position.bookId
+
+        when (place) {
+            Place.ABOVE -> {
+                db.note().incrementLftForLftGe(bookId, targetNote.position.lft, spaceRequired)
+                db.note().incrementRgtForRgtGtOrRoot(bookId, targetNote.position.lft, spaceRequired)
+            }
+
+            Place.UNDER -> {
+                db.note().incrementLftForLftGt(bookId, targetNote.position.rgt, spaceRequired)
+                db.note().incrementRgtForRgtGeOrRoot(bookId, targetNote.position.rgt, spaceRequired)
+            }
+
+            Place.UNDER_AS_FIRST -> {
+                db.note().incrementLftForLftGt(bookId, targetNote.position.lft, spaceRequired)
+                db.note().incrementRgtForRgtGtOrRoot(bookId, targetNote.position.lft, spaceRequired)
+            }
+
+            Place.BELOW -> {
+                db.note().incrementLftForLftGt(bookId, targetNote.position.rgt, spaceRequired)
+                db.note().incrementRgtForRgtGtOrRoot(bookId, targetNote.position.rgt, spaceRequired)
+            }
+
+            else -> throw IllegalArgumentException("Unsupported paste relative position $place")
+        }
+    }
+
+
+    fun updateNote(noteId: Long, notePayload: NotePayload): Note? {
+        val noteAndParent = db.note().getNoteAndParent(noteId)
+
+        if (noteAndParent.isEmpty()) return null
+
+        val note = noteAndParent.last()
+
+        return db.runInTransaction(Callable {
+            updateBookIsModified(note.position.bookId, true)
+
+            replaceNoteProperties(noteId, notePayload.properties)
+            replaceNoteEvents(noteId, notePayload.title, notePayload.content, notePayload.properties)
+
+            val newNote = note.copy(
+                    title = notePayload.title,
+                    content = notePayload.content,
+                    contentLineCount = MiscUtils.lineCount(notePayload.content),
+                    state = notePayload.state,
+                    priority = notePayload.priority,
+                    scheduledRangeId = getOrgRangeId(notePayload.scheduled),
+                    deadlineRangeId = getOrgRangeId(notePayload.deadline),
+                    closedRangeId = getOrgRangeId(notePayload.closed),
+                    tags = Tags(notePayload.tags)
+            )
+
+            val count = db.note().update(newNote)
+
+            // first we try to update our own title in case we have child tasks or checkboxes
+            val ownStateChanged = tryUpdateTitleCookies(newNote)
+
+            if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Updated $count note: $newNote")
+
+            // then we try to update our parent's title and state in case we're a child task
+            // whose todo/done state (or automatic transition) may have changed
+            if (newNote.state != note.state || ownStateChanged) {
+                tryUpdateTitleCookiesOfParent(noteId)
+            }
+
+            triggerCalendarSync()
+
+            newNote
+        })
+    }
+
+    private fun tryUpdateTitleCookiesOfParent(childNoteId: Long) {
+        val ancestors = getNoteAncestors(childNoteId)
+
+        ancestors.lastOrNull()?.id?.let { updateNoteAndAncestorsAfterChange(it) }
+    }
+
+    /**
+     * Recomputes the statistics cookie/state of the given note and of every ancestor up to the
+     * top of the outline. Because each level aggregates its whole subtree, a change anywhere
+     * below can affect every ancestor, so the whole chain is refreshed.
+     * Must be called within a DB transaction.
+     */
+    private fun updateNoteAndAncestorsAfterChange(noteId: Long) {
+        var currentId: Long? = noteId
+
+        while (currentId != null) {
+            val current = db.note().get(currentId) ?: break
+
+            tryUpdateTitleCookies(current)
+
+            // Keep climbing while there are still outline ancestors above.
+            currentId = if (current.position.level > 1) current.position.parentId else null
+        }
+    }
+
+    /**
+     * Updates the note's title statistics cookie ([%] or [/]) and, when the note is a parent
+     * task, automatically transitions its TODO/DONE state.
+     *
+     * Completion is computed bottom-up as the average completion of the heading's direct
+     * child task-units (a unit is a direct child that is a task, or whose subtree contains
+     * tasks). A heading with task descendants:
+     *
+     * - gains a TODO (or DONE when fully complete) keyword if it has none,
+     * - gets a [N%] cookie appended when missing and keeps it in sync,
+     * - TODO -> DONE when the subtree is fully complete,
+     * - DONE -> TODO as soon as the subtree is no longer fully complete.
+     *
+     * Must be called within a DB transaction. Returns true when the note's state was changed,
+     * so callers can continue updating the note's ancestors.
+     */
+    private fun tryUpdateTitleCookies(note: Note): Boolean {
+        // The root note and book-level nodes are not part of the outline.
+        if (note.position.level <= 0) {
+            return false
+        }
+
+        // as of my testing in org 9.6.15, if a heading has child headings which are TODO items
+        // as well as content which are checkboxes, it's unpredictable how the title changes, but:
+        //
+        // 1. it does NOT count both the checkboxes and child headings together, but rather favors
+        //    one or the other
+        // 2. it seems to favor them in the order they appear (top-down), but also somehow seems to
+        //    favor child headings more
+        //
+        // for sanity's sake, we're just going to process for any checkboxes and then process for
+        // any child task-units, in that order
+
+        val doneKeywords = AppPreferences.doneKeywordsSet(context)
+        val todoKeywords = AppPreferences.todoKeywordsSet(context)
+
+        val titleUpdater = StateChangeParentTitleUpdater(todoKeywords, doneKeywords)
+
+        var newTitle = if (note.content.isNullOrEmpty()) note.title
+            else titleUpdater.updateTitleForPossibleCheckboxes(note.title, note.content)
+
+        val stateLogic = ParentTaskStateLogic(
+                todoKeywords,
+                doneKeywords,
+                AppPreferences.getFirstTodoState(context),
+                AppPreferences.getFirstDoneState(context))
+
+        val progress = computeNoteProgress(note.id, stateLogic)
+
+        if (progress.hasUnits) {
+            val completionPct = (progress.completion * 100).roundToInt()
+
+            newTitle = stateLogic.titleForTaskProgress(
+                    newTitle,
+                    hasUnits = true,
+                    completionPct = completionPct,
+                    doneUnits = progress.doneUnits,
+                    totalUnits = progress.totalUnits)
+        }
+
+        if (newTitle != note.title) {
+            val newNote = note.copy(title = newTitle)
+
+            val count = db.note().update(newNote)
+
+            updateBookIsModified(note.position.bookId, true)
+
+            if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Updated $count note: $newNote")
+        }
+
+        if (progress.hasUnits) {
+            val completionPct = (progress.completion * 100).roundToInt()
+
+            val targetState = stateLogic.stateForTaskProgress(note.state, completionPct)
+
+            if (targetState != null && targetState != note.state) {
+                if (BuildConfig.LOG_DEBUG) {
+                    LogUtils.d(TAG, "Auto-transitioning note ${note.id} from ${note.state} to $targetState")
+                }
+
+                return setNoteStateWithinTransaction(note, targetState) > 0
+            }
+        }
+
+        return false
+    }
+
+    /** Progress of a note's subtree relevant for its statistics cookie. */
+    private data class NoteProgress(
+            val hasUnits: Boolean,
+            val completion: Double,
+            val doneUnits: Int,
+            val totalUnits: Int)
+
+    /**
+     * Bottom-up progress of [noteId]'s subtree. A "unit" of a heading is a direct child that is
+     * itself a task, or whose subtree contains tasks. A leaf task contributes 0 (TODO) or 1
+     * (DONE); a container contributes the average completion of its direct units.
+     */
+    private fun computeNoteProgress(noteId: Long, stateLogic: ParentTaskStateLogic): NoteProgress {
+        val subtree = db.note().getNotesForSubtrees(setOf(noteId))
+        if (subtree.isEmpty()) {
+            return NoteProgress(false, 0.0, 0, 0)
+        }
+
+        val childrenByParent = subtree.groupBy { it.position.parentId }
+
+        val completion = HashMap<Long, Double>()
+        val hasTask = HashMap<Long, Boolean>()
+
+        var result = NoteProgress(false, 0.0, 0, 0)
+
+        // Children (larger lft) come before parents when iterating backwards.
+        for (node in subtree.asReversed()) {
+            val selfTask = stateLogic.isTask(node.state)
+
+            var units = 0
+            var doneUnits = 0
+            var sum = 0.0
+
+            for (child in childrenByParent[node.id].orEmpty()) {
+                if (hasTask[child.id] == true) {
+                    val childCompletion = completion[child.id] ?: 0.0
+
+                    units++
+                    if (childCompletion >= 1.0 - 1e-9) {
+                        doneUnits++
+                    }
+                    sum += childCompletion
+                }
+            }
+
+            val nodeHasTask = units > 0 || selfTask
+            val nodeCompletion = when {
+                units > 0 -> sum / units
+                selfTask -> if (AppPreferences.doneKeywordsSet(context).contains(node.state)) 1.0 else 0.0
+                else -> 0.0
+            }
+
+            completion[node.id] = nodeCompletion
+            hasTask[node.id] = nodeHasTask
+
+            if (node.id == noteId) {
+                result = NoteProgress(units > 0, nodeCompletion, doneUnits, units)
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * Recomputes statistics cookies and parent-task states for every task container in the
+     * whole book, bottom-up in a single pass, and writes any changes back.
+     *
+     * Called after a book is (re)loaded from a repo/file and when a book is opened, so that
+     * external edits - pulled in by sync - are reflected (e.g. a parent task completes once
+     * an externally-DONE child makes every descendant done).
+     *
+     * @return the number of notes whose title/state actually changed
+     */
+    fun recomputeBookProgress(bookId: Long): Int {
+        return db.runInTransaction(Callable {
+            recomputeBookProgressInTransaction(bookId)
+        })
+    }
+
+    /** Must be called within a DB transaction. */
+    private fun recomputeBookProgressInTransaction(bookId: Long): Int {
+        // Keep the in-memory stopwatch-subtree totals fresh (used by the list binder).
+        refreshClockAggregates(bookId)
+
+        val notes = db.note().getAllNotesInBook(bookId)
+        if (notes.isEmpty()) {
+            return 0
+        }
+
+        val childrenByParent = notes.groupBy { it.position.parentId }
+
+        val doneKeywords = AppPreferences.doneKeywordsSet(context)
+        val todoKeywords = AppPreferences.todoKeywordsSet(context)
+
+        val stateLogic = ParentTaskStateLogic(
+                todoKeywords,
+                doneKeywords,
+                AppPreferences.getFirstTodoState(context),
+                AppPreferences.getFirstDoneState(context))
+
+        val completion = HashMap<Long, Double>()
+        val hasTask = HashMap<Long, Boolean>()
+
+        var changed = 0
+
+        // Children (larger lft) come before parents when iterating backwards.
+        for (node in notes.asReversed()) {
+            val selfTask = stateLogic.isTask(node.state)
+
+            var units = 0
+            var doneUnits = 0
+            var sum = 0.0
+
+            for (child in childrenByParent[node.id].orEmpty()) {
+                if (hasTask[child.id] == true) {
+                    val childCompletion = completion[child.id] ?: 0.0
+
+                    units++
+                    if (childCompletion >= 1.0 - 1e-9) {
+                        doneUnits++
+                    }
+                    sum += childCompletion
+                }
+            }
+
+            val nodeCompletion = when {
+                units > 0 -> sum / units
+                selfTask -> if (doneKeywords.contains(node.state)) 1.0 else 0.0
+                else -> 0.0
+            }
+
+            completion[node.id] = nodeCompletion
+            hasTask[node.id] = units > 0 || selfTask
+
+            if (units > 0) {
+                val completionPct = (nodeCompletion * 100).roundToInt()
+
+                val newTitle = stateLogic.titleForTaskProgress(
+                        node.title,
+                        hasUnits = true,
+                        completionPct = completionPct,
+                        doneUnits = doneUnits,
+                        totalUnits = units)
+
+                if (newTitle != node.title) {
+                    if (db.note().update(node.copy(title = newTitle)) > 0) {
+                        changed++
+                    }
+                }
+
+                val targetState = stateLogic.stateForTaskProgress(node.state, completionPct)
+
+                if (targetState != null && targetState != node.state) {
+                    if (setNoteStateWithinTransaction(node, targetState) > 0) {
+                        changed++
+                    }
+                }
+            }
+        }
+
+        if (changed > 0) {
+            updateBookIsModified(bookId, true)
+        }
+
+        return changed
+    }
+
+    fun deleteNotes(bookId: Long, ids: Set<Long>): Int {
+        return db.runInTransaction(Callable {
+            // Parents of the deleted notes, used to refresh their cookies after deletion.
+            val parentIds = ids
+                    .mapNotNull { id -> db.note().getAncestors(id).lastOrNull()?.id }
+                    .toSet()
+
+            db.noteAncestor().deleteForSubtrees(ids)
+
+            db.note().updateDescendantsCountForAncestors(ids, ids)
+
+            val count = db.note().deleteById(ids)
+
+            parentIds.forEach { parentId ->
+                updateNoteAndAncestorsAfterChange(parentId)
+            }
+
+            updateBookIsModified(bookId, true)
+
+            triggerCalendarSync()
+
+            count
+        })
+    }
+
+    fun getNoteEvents(noteId: Long): List<NoteEvent> {
+        return db.noteEvent().get(noteId)
+    }
+
+    private fun replaceNoteEvents(noteId: Long, title: String, content: String?, properties: OrgProperties?) {
+        db.noteEvent().deleteForNote(noteId)
+
+        insertNoteEvents(noteId, title, content, properties)
+    }
+
+    /**
+     * Events may come from the note's title, content or properties
+     */
+    private fun insertNoteEvents(noteId: Long, title: String, content: String?, properties: OrgProperties?) {
+        if (title.isNotEmpty()) {
+            parseAndInsertEvents(noteId, title)
+        }
+
+        if (!content.isNullOrEmpty()) {
+            parseAndInsertEvents(noteId, content)
+        }
+
+        if (properties != null && !properties.isEmpty) {
+            for (property: OrgProperty in properties.all) {
+                parseAndInsertEvents(noteId, property.value)
+            }
+        }
+    }
+
+    private fun parseAndInsertEvents(noteId: Long, str: String) {
+        OrgActiveTimestamps.parse(str).forEach { range ->
+            getOrgRangeId(range)?.let { orgRangeId ->
+                db.noteEvent().replace(NoteEvent(noteId, orgRangeId))
+            }
+        }
+    }
+
+    /**
+     * Loads book from resource.
+     */
+    @Throws(IOException::class)
+    fun loadBookFromResource(name: String, format: BookFormat, resources: Resources, resId: Int): BookView? {
+        resources.openRawResource(resId).use {
+            return loadBookFromStream(name, format, it)
+        }
+    }
+
+    @Throws(IOException::class)
+    fun loadBookFromRepo(rook: Rook): BookView? {
+        val repoRelativePath = BookName.getRepoRelativePath(rook.repoUri, rook.uri)
+
+        return loadBookFromRepo(rook.repoId, rook.repoType, rook.repoUri.toString(), repoRelativePath)
+    }
+
+    @Throws(IOException::class)
+    fun loadBookFromRepo(repoId: Long, repoType: RepoType, repoUrl: String, repoRelativePath: String): BookView? {
+        val book: BookView?
+
+        val repo = getRepoInstance(repoId, repoType, repoUrl)
+
+        val tmpFile = getTempBookFile()
+        try {
+            /* Download from repo. */
+            val vrook = repo.retrieveBook(repoRelativePath, tmpFile)
+
+            val bookName = BookName.fromRepoRelativePath(repoRelativePath)
+
+            /* Store from file to Shelf. */
+            book = loadBookFromFile(bookName.name, bookName.format, tmpFile, vrook)
+
+        } finally {
+            tmpFile.delete()
+        }
+
+        return book
+    }
+
+    @Throws(IOException::class)
+    fun loadBookFromStream(name: String, format: BookFormat, inputStream: InputStream): BookView? {
+        /* Save content to temporary file. */
+        val tmpFile = getTempBookFile()
+
+        try {
+            MiscUtils.writeStreamToFile(inputStream, tmpFile)
+            return loadBookFromFile(name, format, tmpFile)
+
+        } finally {
+            tmpFile.delete()
+        }
+    }
+
+    @JvmOverloads
+    @Throws(IOException::class)
+    fun loadBookFromFile(
+            name: String,
+            @Suppress("UNUSED_PARAMETER") format: BookFormat,
+            file: File,
+            vrook: VersionedRook? = null,
+            selectedEncoding: String? = null
+    ): BookView? {
+
+        val encoding = if (selectedEncoding == null && AppPreferences.forceUtf8(context)) {
+            "UTF-8"
+        } else {
+            selectedEncoding
+        }
+
+        val bookId = loadBookFromFile(file.path, name, vrook, encoding)
+
+        return getBookView(bookId)
+    }
+
+    private fun loadBookFromFile(
+            filePath: String,
+            bookName: String,
+            vrook: VersionedRook?,
+            selectedEncoding: String?): Long {
+
+        try {
+            val encoding = Encoding.detect(filePath, selectedEncoding)
+
+            return db.runInTransaction(Callable {
+                val bookId = loadBookFromReader(
+                        bookName,
+                        vrook,
+                        InputStreamReader(FileInputStream(File(filePath)), encoding.used),
+                        encoding
+                )
+
+                // Recompute statistics cookies/states of the freshly-loaded book, so external
+                // edits pulled in by sync are reflected in parent tasks immediately.
+                recomputeBookProgressInTransaction(bookId)
+
+                bookId
+            })
+
+        } catch (e: IOException) {
+            e.printStackTrace()
+
+            /* Remember that the Android system must be able to communicate the Exception
+             * across process boundaries. This is one of those.
+             */
+            throw IllegalArgumentException(e)
+        }
+    }
+
+    @Throws(IOException::class)
+    private fun loadBookFromReader(
+            bookName: String,
+            vrook: VersionedRook?,
+            inReader: Reader,
+            encoding: Encoding): Long {
+
+        val startedAt = System.currentTimeMillis()
+
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG, "Loading book $bookName...")
+
+        val bookId = db.book().getOrInsert(bookName)
+
+        // Delete all notes from this book
+        db.note().deleteByBookId(bookId)
+
+        /*
+         * Maps node's lft to database id.
+         * Used to update parent id and insert ancestors.
+         * Not using SparseArray as speed is preferred over memory here.
+         */
+        @SuppressLint("UseSparseArrays") val lft2id = HashMap<Long, Long>()
+
+        /* Set of ids for which parent is already set. */
+        val notesWithParentSet = HashSet<Long>()
+
+
+        val useCreatedAtProperty = AppPreferences.createdAt(context)
+        val createdAtProperty = AppPreferences.createdAtProperty(context)
+        val startFolded = AppPreferences.notebooksStartFolded(context)
+
+        BufferedReader(inReader).use { reader ->
+            /*
+             * Create and run parser.
+             * When multiple formats are supported, decide which parser to use here.
+             */
+            OrgParser.Builder()
+                    .setInput(reader)
+                    .setTodoKeywords(AppPreferences.todoKeywordsSet(context))
+                    .setDoneKeywords(AppPreferences.doneKeywordsSet(context))
+                    .setListener(object : OrgNestedSetParserListener {
+                        @Throws(IOException::class)
+                        override fun onNode(node: OrgNodeInSet) {
+
+                            val scheduledRangeId = getOrgRangeId(node.head.scheduled)
+                            val deadlineRangeId = getOrgRangeId(node.head.deadline)
+                            val closedRangeId = getOrgRangeId(node.head.closed)
+                            val clockRangeId = getOrgRangeId(node.head.clock)
+
+                            var content: String? = null
+                            var contentLineCount = 0
+
+                            if (node.head.hasContent()) {
+                                content = node.head.content
+                                contentLineCount = MiscUtils.lineCount(node.head.content)
+                            }
+
+                            val position = NotePosition(
+                                    bookId = bookId,
+                                    lft = node.lft,
+                                    rgt = node.rgt,
+                                    level = node.level,
+                                    parentId = 0,
+                                    foldedUnderId = 0,
+                                    isFolded = startFolded && node.level > 0,
+                                    descendantsCount = node.descendantsCount)
+
+                            val note = Note(
+                                    0,
+                                    title = node.head.title,
+                                    priority = node.head.priority,
+                                    state = node.head.state,
+                                    scheduledRangeId = scheduledRangeId,
+                                    deadlineRangeId = deadlineRangeId,
+                                    closedRangeId = closedRangeId,
+                                    clockRangeId = clockRangeId,
+                                    tags = if (node.head.hasTags()) Tags(node.head.tags) else null,
+                                    createdAt = getCreatedAtFromProperty(node, useCreatedAtProperty, createdAtProperty),
+                                    content = content,
+                                    contentLineCount = contentLineCount,
+                                    position = position
+                            )
+
+                            val noteId = db.note().insert(note)
+
+                            insertNoteProperties(noteId, node.head.properties)
+                            insertNoteEvents(noteId, note.title, note.content, node.head.properties)
+
+                            /*
+                             * Update notes' parent IDs and insert ancestors.
+                             * Going through all descendants - nodes between lft and rgt.
+                             *
+                             *  lft:  1    2    3    4    5   6
+                             *            L2   l1   r2   R2
+                             */
+                            lft2id[node.lft] = noteId
+                            for (index in node.lft + 1 until node.rgt) {
+                                val descendantId = lft2id[index]
+                                if (descendantId != null) {
+                                    if (!notesWithParentSet.contains(descendantId)) {
+                                        db.note().updateParentForNote(descendantId, noteId)
+
+                                        if (startFolded && position.level > 0) {
+                                            db.note().setFoldedUnder(descendantId, noteId)
+                                        }
+
+                                        notesWithParentSet.add(descendantId)
+                                    }
+
+                                    db.noteAncestor().insert(NoteAncestor(
+                                            noteId = descendantId,
+                                            bookId = bookId,
+                                            ancestorNoteId = noteId))
+                                }
+                            }
+                        }
+
+                        @Throws(IOException::class)
+                        override fun onFile(file: OrgFile) {
+                            val settings = OrgFileSettings.fromPreface(file.preface)
+                            val filetags = Tags.fromList(settings?.filetags)
+
+                            val book = Book(
+                                    bookId,
+                                    bookName,
+                                    mtime = vrook?.mtime, // Set book's mtime to remote book's
+                                    preface = file.preface, // TODO: Move to and rename OrgFileSettings
+                                    filetags = filetags,
+                                    isIndented = file.settings.isIndented,
+                                    title = file.settings.title,
+                                    isDummy = false,
+                                    usedEncoding = encoding.used,
+                                    detectedEncoding = encoding.detected,
+                                    selectedEncoding = encoding.selected
+                            )
+
+                            db.book().update(book)
+
+                            // Parse and store any properties in the book's preface
+                            if (file.preface.isNotEmpty())
+                                setBookPropertiesFromPreface(bookId, file.preface)
+                        }
+
+                    })
+                    .build()
+                    .parse()
+        }
+
+        if (BuildConfig.LOG_DEBUG)
+            LogUtils.d(TAG, bookName + ": Parsing done in " +
+                    (System.currentTimeMillis() - startedAt) + " ms")
+
+        if (vrook != null) {
+            updateBookLinkAndSync(bookId, vrook)
+        }
+
+        updateBookIsModified(bookId, false)
+
+        return bookId
+    }
+
+    private fun setBookPropertiesFromPreface(bookId: Long, preface: String) {
+        for (property: OrgProperty in OrgProperties.fromString(preface).all) {
+            db.bookProperty().upsert(bookId, property.name, property.value)
+        }
+    }
+
+    private fun getOrgRangeId(range: String?): Long? {
+        return getOrgRangeId(OrgRange.parseOrNull(range))
+    }
+
+    private fun getOrgRangeId(range: OrgRange?): Long? {
+        if (range == null) {
+            return null
+        }
+
+        val str = range.toString()
+
+        val entity = db.orgRange().getByString(str)
+
+        if (entity != null) {
+            return entity.id
+        }
+
+        val startId = getOrgDateTimeId(range.startTime)
+
+        val rangeEndTime = if (range.endTime != null) {
+            range.endTime
+        } else {
+            null
+        }
+        val endId = if (rangeEndTime != null) getOrgDateTimeId(rangeEndTime) else null
+
+        return db.orgRange().insert(OrgRange(0, str, startId, endId))
+    }
+
+    fun openBookForNote(noteId: Long, sparseTree: Boolean) {
+        val noteView = getNoteView(noteId)
+
+        if (noteView != null) {
+            val bookId = noteView.note.position.bookId
+
+            db.runInTransaction {
+                if (sparseTree) {
+                    foldAllNotes(bookId)
+                }
+                unfoldForNote(noteId)
+            }
+
+            // Open book
+            // FIXME: Runs with delay to be executed after the observer for unfoldForNote
+            App.EXECUTORS.mainThread().execute {
+                Handler().postDelayed({
+                    val intent = Intent(AppIntent.ACTION_OPEN_BOOK)
+                    intent.putExtra(AppIntent.EXTRA_BOOK_ID, bookId)
+                    intent.putExtra(AppIntent.EXTRA_NOTE_ID, noteId)
+                    LocalBroadcastManager.getInstance(App.getAppContext()).sendBroadcast(intent)
+                }, 100)
+            }
+        }
+    }
+
+    /** Unfolds all ancestors of a note so it becomes visible in its notebook. */
+    fun unfoldToNote(noteId: Long) {
+        if (noteId <= 0) return
+        db.runInTransaction {
+            unfoldForNote(noteId)
+        }
+    }
+
+    private fun getOrgDateTimeId(timestamp: OrgDateTime): Long {
+        return db.orgTimestamp().getByString(timestamp.toString()).let {
+            it?.id ?: db.orgTimestamp().insert(OrgTimestampMapper.fromOrgDateTime(timestamp))
+        }
+    }
+
+    private fun getCreatedAtFromProperty(node: OrgNodeInSet, use: Boolean, name: String): Long? {
+        if (use) {
+            if (node.head.properties.containsKey(name)) {
+                OrgRange.doParse(node.head.properties[name])?.let {
+                    return it.startTime.calendar.timeInMillis
+                }
+            }
+        }
+
+        return null
+    }
+
+    @Throws(IOException::class)
+    fun exportBook(bookId: Long, format: BookFormat): File {
+        /* Get book from database. */
+        val book = getBook(bookId)
+                ?: throw IOException(resources.getString(R.string.book_does_not_exist_anymore))
+
+        /* Get file to write book to. */
+        val file = localStorage.getExportFile(book.name, format)
+
+        /* Write book. */
+        NotesOrgExporter(this).exportBook(book, file)
+
+        /* Make file immediately visible when using MTP.
+         * See https://github.com/orgzly/orgzly-android/issues/44
+         */
+        MediaScannerConnection.scanFile(App.getAppContext(), arrayOf(file.absolutePath), null, null)
+
+        return file
+    }
+
+    fun exportBook(book: Book, writer: Writer) {
+        NotesOrgExporter(this).exportBook(book, writer)
+    }
+
+    fun findNotesHavingProperty(name: String, value: String): List<NoteIdBookId> {
+        return db.note().allNotesHavingPropertyLowerCase(name.lowercase(), value.lowercase())
+    }
+
+    fun findNotesOrBooksHavingProperty(name: String, value: String): List<Any?> {
+        val foundNote = findNotesHavingProperty(name, value)
+        if (foundNote.isNotEmpty())
+            return foundNote
+        return db.book().allBooksHavingPropertyLowerCase(name.lowercase(), value.lowercase())
+    }
+
+    fun findUniqueNoteHavingProperty(name: String, value: String): NoteIdBookId? {
+        val foundNotes = db.note().allNotesHavingPropertyLowerCase(name.lowercase(), value.lowercase())
+        return if (foundNotes.isEmpty()) null
+        else if (foundNotes.size == 1) foundNotes[0]
+        else {
+            val msg = App.getAppContext().getString(R.string.error_multiple_notes_with_matching_property_value, name, value)
+            throw RuntimeException(msg)
+        }
+    }
+
+    fun exportSettingsAndSearchesToNote(note: Note) {
+        val notePayload = getNotePayload(note.id) ?: throw RuntimeException(context.getString(R.string.failed_to_get_note_payload))
+        var noteIdPropertyValue = notePayload.properties.get("ID")
+        if (noteIdPropertyValue == null) {
+            // Note has no "ID" property - let's add one
+            noteIdPropertyValue = UUID.randomUUID().toString()
+            notePayload.properties.put("ID", noteIdPropertyValue)
+            updateNote(note.id, notePayload)
+        }
+        // Ensure that the note's "ID" property value is unique
+        val targetNote = findUniqueNoteHavingProperty("ID", noteIdPropertyValue)
+        // Get settings as JSON
+        val settingsJsonObject = AppPreferences.getDefaultPrefsAsJsonObject(context)
+        // Get saved searches as JSON
+        val savedSearchesJsonObject = Gson().fromJson("{}", JsonObject::class.java)
+        getSavedSearches().forEach {
+            savedSearchesJsonObject.addProperty(it.name, it.query)
+        }
+        // Put them together
+        val finalMap = mapOf("settings" to settingsJsonObject, "saved_searches" to savedSearchesJsonObject)
+        val finalJsonString = Gson().toJson(finalMap)
+        updateNoteContent(targetNote!!.noteId, finalJsonString)
+        AppPreferences.settingsExportAndImportNoteId(context, noteIdPropertyValue)
+    }
+
+    fun importSettingsAndSearchesFromNote(note: Note) {
+        var importedSomething = false
+        val notePayload = getNotePayload(note.id) ?: throw RuntimeException(
+            context.getString(R.string.failed_to_get_note_payload))
+        if (notePayload.content.isNullOrEmpty())
+            throw RuntimeException(context.getString(R.string.note_has_no_content))
+        val gson: Map<*, *>
+        try {
+            gson = Gson().fromJson(notePayload.content, Map::class.java)
+        } catch (e: JsonSyntaxException) {
+            throw RuntimeException(context.getString(R.string.note_does_not_contain_valid_json))
+        }
+        if (!("settings" in gson.keys && "saved_searches" in gson.keys)) // Both keys must be present
+            throw RuntimeException(context.getString(R.string.imported_json_is_missing_mandatory_fields))
+        val settings = gson["settings"] as Map<String, *>
+        if (settings.isNotEmpty()) {
+            AppPreferences.setDefaultPrefsFromJsonMap(context, settings)
+            importedSomething = true
+        }
+        val savedSearches: List<SavedSearch> = (gson["saved_searches"] as Map<String, String>)
+            .entries
+            .mapIndexed { index, entry ->
+                SavedSearch(0, entry.key, entry.value, index + 1)
+            }
+        if (savedSearches.isNotEmpty()) {
+            replaceSavedSearches(savedSearches)
+            importedSomething = true
+        }
+        if (!importedSomething)
+            throw RuntimeException("Found no settings or saved searches to import.")
+    }
+
+    /*
+     * Saved search
+     */
+
+    fun getSavedSearch(id: Long): SavedSearch? {
+        return db.savedSearch().get(id)
+    }
+
+    fun getSavedSearches(): List<SavedSearch> {
+        return db.savedSearch().getAll()
+    }
+
+    fun getSavedSearchesLiveData(): LiveData<List<SavedSearch>> {
+        return db.savedSearch().getLiveData()
+    }
+
+    /**
+     * Get [SavedSearch] by name (case insensitive).
+     */
+    fun getSavedSearchesByNameIgnoreCase(name: String): List<SavedSearch> {
+        return db.savedSearch().getAllByNameIgnoreCase(name)
+    }
+
+    fun createSavedSearch(savedSearch: SavedSearch): Long {
+        val nextPosition = db.savedSearch().getNextAvailablePosition()
+        return db.savedSearch().insert(savedSearch.copy(position = nextPosition))
+    }
+
+    fun updateSavedSearch(savedSearch: SavedSearch) {
+        db.savedSearch().update(savedSearch)
+    }
+
+    fun deleteSavedSearches(ids: Set<Long>) {
+        db.savedSearch().delete(ids)
+    }
+
+    fun moveSavedSearchUp(id: Long) {
+        db.savedSearch().get(id)?.let { savedSearch ->
+            db.savedSearch().getFirstAbove(savedSearch.position)?.let {
+                swapSavedSearchPositions(savedSearch, it)
+            }
+        }
+    }
+
+    fun moveSavedSearchDown(id: Long) {
+        db.savedSearch().get(id)?.let { savedSearch ->
+            db.savedSearch().getFirstBelow(savedSearch.position)?.let {
+                swapSavedSearchPositions(savedSearch, it)
+            }
+        }
+    }
+
+    private fun swapSavedSearchPositions(savedSearch: SavedSearch, other: SavedSearch) {
+        db.runInTransaction {
+            db.savedSearch().update(savedSearch.copy(position = other.position))
+            db.savedSearch().update(other.copy(position = savedSearch.position))
+        }
+    }
+
+    fun exportSavedSearches(uri: Uri?): Int {
+        return FileSavedSearchStore(context, this).exportSearches(uri)
+    }
+
+    fun importSavedSearches(uri: Uri): Int {
+        return FileSavedSearchStore(context, this).importSearches(uri)
+    }
+
+
+    fun replaceSavedSearches(savedSearches: List<SavedSearch>): Int {
+        db.savedSearch().deleteAll()
+        db.savedSearch().insert(savedSearches)
+        return savedSearches.size
+    }
+
+    /*
+     * Repo
+     */
+
+    fun selectRepos(): LiveData<List<Repo>> {
+        return db.repo().getAllLiveData()
+    }
+
+    fun getRepos(): List<Repo> {
+        return db.repo().getAll()
+    }
+
+    fun getRepo(url: String): Repo? {
+        return db.repo().get(url)
+    }
+
+    fun getRepoLiveData(id: Long): LiveData<Repo> {
+        return db.repo().getLiveData(id)
+    }
+
+    fun getRepo(id: Long): Repo? {
+        return db.repo().get(id)
+    }
+
+    fun createRepo(repoWithProps: RepoWithProps): Long {
+        if (getRepo(repoWithProps.repo.url) != null) {
+            throw RepoCreate.AlreadyExists()
+        }
+
+        val id = db.repo().insert(repoWithProps.repo)
+
+        AppPreferences.repoPropsMap(context, id, repoWithProps.props)
+
+        return id
+    }
+
+    fun updateRepo(repoWithProps: RepoWithProps): Long {
+        // Since old url might be in use, do not update the existing record, but replace it
+        val newId = db.repo().deleteAndInsert(repoWithProps.repo)
+
+        AppPreferences.repoPropsMapDelete(context, repoWithProps.repo.id)
+
+        AppPreferences.repoPropsMap(context, newId, repoWithProps.props)
+
+        return newId
+    }
+
+    fun deleteRepo(id: Long) {
+        db.repo().delete(id)
+
+        AppPreferences.repoPropsMapDelete(context, id)
+    }
+
+    /*
+     * Times
+     */
+
+    fun times(): List<ReminderTimeDao.NoteTime> {
+        return db.reminderTime().getAll()
+    }
+
+    /**
+     * Return all known tags.
+     * Splits space-separated tag strings from database into individual tags, deduplicates, and sorts.
+     */
+    fun selectAllTagsLiveData(): LiveData<List<String>> {
+        return db.note().getDistinctTagsLiveData().map { tagsList ->
+            tagsList.flatMap { Tags.fromString(it).tags }.distinct().sorted()
+        }
+    }
+
+    fun selectAllTags(): List<String> {
+        return db.note().getDistinctTags()
+                .flatMap { Tags.fromString(it).tags }
+                .distinct()
+    }
+
+    /**
+     * Using current states configuration, update states and titles for all notes.
+     * Keywords that were part of the title can become states and vice versa.
+     */
+    @Throws(IOException::class)
+    fun reParseNotesStateAndTitles(): Int {
+        val parserBuilder = OrgParser.Builder()
+                .setTodoKeywords(AppPreferences.todoKeywordsSet(context))
+                .setDoneKeywords(AppPreferences.doneKeywordsSet(context))
+
+        var updated = 0
+
+        val parserWriter = OrgParserWriter()
+
+        db.runInTransaction {
+            db.noteView().getAll().forEach { noteView ->
+                val note = noteView.note
+
+                val head = OrgMapper.toOrgHead(noteView)
+
+                val headString = parserWriter.whiteSpacedHead(head, note.position.level, false)
+
+                /* Re-parse heading using current setting of keywords. */
+                val file = parserBuilder
+                        .setInput(headString)
+                        .build()
+                        .parse()
+
+                if (file.headsInList.size != 1) {
+                    throw IOException("Got ${file.headsInList.size} notes after parsing \"$headString\" generated from $note")
+                }
+
+                val newHead = file.headsInList[0].head
+
+                /* Update if state, title or priority are different. */
+                if (!TextUtils.equals(newHead.state, head.state) ||
+                        !TextUtils.equals(newHead.title, head.title) ||
+                        !TextUtils.equals(newHead.priority, head.priority)) {
+
+                    updated += db.note().update(note.id, newHead.title, newHead.state, newHead.priority)
+                }
+            }
+        }
+
+        return updated
+    }
+
+    /**
+     * Syncs created-at time and property, using lower value if both exist.
+     */
+    @Throws(IOException::class)
+    fun syncCreatedAtTimeWithProperty() {
+        db.runInTransaction {
+            syncCreatedAtTimeWithPropertyInTransaction()
+        }
+    }
+
+    private fun syncCreatedAtTimeWithPropertyInTransaction() {
+        if (!AppPreferences.createdAt(context)) {
+            return
+        }
+
+        val propName = AppPreferences.createdAtProperty(context)
+
+        val dbProperties = db.noteProperty().getAll()
+                .fold(mutableMapOf<Long, MutableMap<String, String>>()) { map, property ->
+                    map.getOrPut(property.noteId) {
+                        mutableMapOf()
+                    }.apply {
+                        put(property.name, property.value)
+
+                        if (BuildConfig.LOG_DEBUG)
+                            LogUtils.d(TAG, "Property for note ${property.noteId}: "
+                                    + "${property.name} = ${property.value}")
+                    }
+
+                    map
+                }
+
+        // If new property is added to the note below, book has to be marked as modified.
+        val bookIds = HashSet<Long>()
+
+        /*
+         * Get all notes.
+         * This is slow and only notes that have either created-at time or created-at property
+         * are actually needed. But since this syncing (triggered on preference change) is done
+         * so rarely, we don't bother.
+         */
+        db.note().getAll().forEach { note ->
+            val propValue = dbProperties[note.id]?.get(propName)
+
+            val propValueOrgDateTime = OrgDateTime.doParse(propValue)
+
+            val noteCreatedAt = note.createdAt ?: 0
+
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "Parsing note ${note.id} with property value $propValue "
+                        + "($propValueOrgDateTime) and createdAt $noteCreatedAt")
+
+            if (noteCreatedAt > 0 && propValueOrgDateTime == null) {
+                // Note has only created-at time
+
+                setNoteProperty(note, propName, noteCreatedAt, propValue, bookIds)
+
+            } else if (noteCreatedAt > 0 && propValueOrgDateTime != null) {
+                // Both note property and created-at time exist
+
+                // Use older created-at
+                if (propValueOrgDateTime.calendar.timeInMillis < noteCreatedAt) {
+                    setNoteCreatedAt(note, propValueOrgDateTime, noteCreatedAt)
+                } else {
+                    setNoteProperty(note, propName, noteCreatedAt, propValue, bookIds)
+                }
+
+                // Or prefer property and set created-at time?
+
+            } else if (noteCreatedAt == 0L && propValueOrgDateTime != null) {
+                // Note has only property
+                setNoteCreatedAt(note, propValueOrgDateTime, noteCreatedAt)
+
+            } // else: Neither created-at time nor property are set
+        }
+
+        updateBookIsModified(bookIds, true)
+    }
+
+    private fun setNoteCreatedAt(note: Note, propValue: OrgDateTime, currValue: Long) {
+        val value = propValue.calendar.timeInMillis
+
+        if (value != currValue) {
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "Updating created-at time", note.id, currValue, value)
+
+            setNoteCreatedAtTime(note.id, value)
+
+        } else {
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "Skipping update", note.id, value)
+        }
+    }
+
+    private fun setNoteProperty(
+            note: Note,
+            createdAtPropName: String,
+            createdAt: Long,
+            currPropValue: String?,
+            bookIds: MutableSet<Long>) {
+
+        val value = OrgDateTime(createdAt, false).toString()
+
+        if (value != currPropValue) {
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "Updating property", note.id, createdAtPropName, currPropValue, value)
+
+            setNoteProperty(note.id, createdAtPropName, value)
+
+            // Mark book as modified
+            bookIds.add(note.position.bookId)
+
+        } else {
+            if (BuildConfig.LOG_DEBUG)
+                LogUtils.d(TAG, "Skipping update", note.id, createdAtPropName, value)
+        }
+    }
+
+    fun importGettingStartedBook() {
+        val name = resources.getString(R.string.getting_started_notebook_name)
+
+        db.runInTransaction {
+            val book = loadBookFromResource(
+                    name,
+                    BookFormat.ORG,
+                    resources,
+                    GETTING_STARTED_NOTEBOOK_RESOURCE_ID)
+
+            if (book != null) {
+                setBookLastActionAndSyncStatus(book.book.id, BookAction.forNow(
+                        BookAction.Type.INFO,
+                        resources.getString(R.string.loaded_from_resource, name)))
+            }
+        }
+    }
+
+    /**
+     * Clear all data from tables.
+     */
+    fun clearDatabase() {
+        db.runInTransaction {
+            db.clearAllTables()
+
+            OrgzlyDatabase.insertDefaultSearches(db.openHelper.writableDatabase)
+        }
+
+        // Clear last sync time
+        AppPreferences.lastSuccessfulSyncTime(context, 0L)
+
+        // Clear repo preferences
+        AppPreferences.repoPropsMapDelete(context)
+
+        val intent = Intent(AppIntent.ACTION_DB_CLEARED)
+        LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
+    }
+
+    /**
+     * Recalculate timestamps after time zone change.
+     */
+    fun updateTimestamps() {
+        if (BuildConfig.LOG_DEBUG) LogUtils.d(TAG)
+
+        db.orgTimestamp().getAll().forEach {
+            val timestamp = OrgDateTime.doParse(it.string).calendar.timeInMillis
+            db.orgTimestamp().update(it.copy(timestamp = timestamp))
+        }
+    }
+
+    fun getSyncRepos(): List<SyncRepo> {
+        val list = ArrayList<SyncRepo>()
+        for ((id, type, url) in getRepos()) {
+            try {
+                list.add(getRepoInstance(id, type, url))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+        }
+        return list
+    }
+
+    fun getRepoInstance(id: Long, type: RepoType, url: String): SyncRepo {
+        // Load additional repo parameters, if available
+        val props = getRepoPropsMap(id)
+
+        val repoWithProps = RepoWithProps(Repo(id, type, url), props)
+
+        return repoFactory.getInstance(repoWithProps)
+    }
+
+    fun getRepoPropsMap(id: Long): Map<String, String> {
+        return AppPreferences.repoPropsMap(context, id)
+    }
+
+    fun updateBooksStatusToCanceled() {
+        db.book().updateStatusToCanceled(
+            BookAction.Type.PROGRESS,
+            BookAction.Type.INFO,
+            context.getString(R.string.canceled),
+            System.currentTimeMillis(),
+            null)
+    }
+
+    companion object {
+        private val TAG = DataRepository::class.java.name
+
+        const val GETTING_STARTED_NOTEBOOK_RESOURCE_ID = R.raw.orgzly_getting_started
+
+        /** Private properties used by the manual stopwatch (not used for scheduling/reminders). */
+        const val CLOCK_START_PROPERTY = "CLOCK_START"
+        const val CLOCKED_SECONDS_PROPERTY = "CLOCKED_SECONDS"
+
+        /** Repeating tasks whose base date is older than this are ignored by the today view. */
+        private const val REPEAT_ACTIVE_DAYS = 365
+
+        /** Private property holding a top-level note's outline accent color. */
+        const val OUTLINE_COLOR_PROPERTY = "OUTLINE_COLOR"
+    }
+}

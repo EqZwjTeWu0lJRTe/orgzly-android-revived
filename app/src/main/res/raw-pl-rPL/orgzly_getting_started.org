@@ -1,0 +1,118 @@
+Witaj w Orgzly!
+
+* Notatki
+** Kliknij notatkę, aby ją otworzyć
+** Kliknij i przytrzymaj notatkę, aby ją zaznaczyć
+
+Możesz zaznaczyć wiele notatek.
+
+** Przeciągnij notatkę w prawo, aby otworzyć szybkie menu
+
+Przeciągnij w lewo, aby otworzyć inne menu.
+
+** Zwiń notatkę, która zawiera inne notatki, klikając ikonę „–” obok niej
+
+Przytrzymaj ikonę „+”, aby rozwinąć wszystkie podrzędne notatki.
+
+*** Liczba poziomów notatek jest nieograniczona
+**** Wykorzystaj to, aby lepiej uporządkować swoje notatki
+
+** Notatka może mieć przypisane znaczniki :znacznik1:znacznik2:
+*** Podrzędna notatka dziedziczy znaczniki :znacznik3:
+
+Jeśli wyszukasz notatki ze znacznikiem „znacznik1” za pomocą zapytania „t.znacznik1”, to ta notatka zostanie uwzględniona w wynikach wyszukiwania.
+
+*** A note that has the =ARCHIVE= tag set is grayed out :ARCHIVE:
+
+** TODO Notatka może mieć przypisany stan
+
+Możesz skonfigurować dowolną liczbę stanów do użycia: TODO, NEXT, DONE, itp.
+
+*** Istnieją dwa /typy/ stanów: do zrobienia i zrobione
+
+*** DONE To jest notatka ze /zrobionym/ typem stanu
+CLOSED: [2018-01-24 Wed 17:00]
+
+** Parent notes can track state of child notes [1/3] [33%]
+
+*** TODO To track the ratio of TODO vs DONE items, add [/] to the note's title
+
+*** TODO To track the percentage of DONE vs TODO items, add [%] to the note's title
+
+*** DONE Both can be used in tandem
+CLOSED: [2025-03-13 Thu 08:37]
+
+The order doesn't matter, and the counts will be updated automatically.
+
+** Notatka może mieć zaplanowany termin
+SCHEDULED: <2015-02-20 Fri 15:15>
+
+*** Zaplanowane terminy mogą się okresowo powtarzać
+SCHEDULED: <2015-02-16 Mon .+2d>
+
+** Możesz również ustawić termin ostateczny
+DEADLINE: <2015-02-20 Fri>
+
+** Event times can be used anywhere in the note's content
+
+You can have multiple event times:
+
+- <2015-02-20 Fri>
+- <2015-02-21 Sat>
+
+** Obsługiwane są przypomnienia o zaplanowanych i ostatecznych terminach
+
+Są one domyślnie wyłączone i muszą zostać włączone w ustawieniach.
+
+** [#A] Notatka może mieć priorytet
+
+Możesz zmienić liczbę poziomów priorytetów w ustawieniach. Możesz również zmienić domyślny priorytet, przypisywany notatkom, które nie mają ustawionego żadnego.
+
+** Notatka może zawierać łącza
+
+Wybierz numer telefonu (tel:123-456-789), wyślij wiadomość SMS (sms:123-456-789), napisz e-mail (mailto:support@orgzlyrevived.com) lub odwiedź stronę internetową ([[https://www.orgzlyrevived.com][Orgzlyrevived.com]]).
+
+Możesz również zamieszczać łącza do innych notatek lub notatników w aplikacji.
+
+Zobacz [[https://www.orgzlyrevived.com/docs#links]] aby uzyskać więcej informacji.
+
+** Orgzly wspiera podstawowe formatowanie tekstu
+
+Możesz stosować *pogrubienie*, /kursywę/, _podkreślenie_, =dosłowny tekst=, ~kod~ i +przekreślenie+.
+
+** Możliwe jest tworzenie list do odhaczania
+
+- [X] Zadanie „1”
+- [ ] Zadanie „2”
+- [ ] Zadanie „3”
+
+Kliknij pole wyboru, aby je przełączyć. Naciśnij klawisz ENTER na końcu linii, aby utworzyć nowy element listy.
+
+** A note's title can also track checkbox list states [66%] [2/3]
+
+- [X] Zadanie 1
+- [ ] Zadanie 2
+- [X] Zadanie 3
+
+* Wyszukiwanie
+** Istnieje wiele obsługiwanych operatorów wyszukiwania
+
+Możesz wyszukiwać notatki według stanu, znaczników, zaplanowanego lub ostatecznego terminu itp.
+
+Zobacz [[https://www.orgzlyrevived.com/docs#search]] aby dowiedzieć się więcej.
+
+** Aby uzyskać szybki dostęp do wyszukań, można je zapisać
+
+Wypróbuj przykładowe wyszukiwania z szuflady nawigacyjnej i zwróć uwagę na użyte w nich zapytania.
+
+Możesz utworzyć własne wyszukiwania, klikając na „Wyszukiwania” w szufladzie nawigacyjnej.
+
+* Synchronizacja
+
+** Notatniki mogą być zapisywane jako zwykłe pliki tekstowe
+
+Pliki zapisywane są w formacie używanym przez [[https://orgmode.org/][Org-mode]].
+
+** Typ lokalizacji (repozytorium)
+
+Możesz synchronizować notatniki z katalogiem na swoim urządzeniu mobilnym, karcie SD lub Dropboxie.

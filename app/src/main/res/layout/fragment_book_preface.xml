@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/CoordinatorLayoutFitsSystemWindows">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/fragment_book_preface_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:clipToPadding="false"
+        android:scrollbarStyle="outsideOverlay"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:focusable="true"
+            android:focusableInTouchMode="true">
+
+            <com.orgzly.android.ui.views.richtext.RichText
+                android:id="@+id/fragment_book_preface_content"
+                app:view_id="@+id/fragment_book_preface_content_view"
+                app:edit_id="@+id/fragment_book_preface_content_edit"
+                app:paddingHorizontal="@dimen/screen_edge"
+                app:paddingVertical="16dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="flagNoFullscreen"
+                android:inputType="text|textCapSentences|textMultiLine"
+                android:hint="@string/book_preface_hint"
+                android:textSize="?attr/fragment_note_content_text_size" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Top toolbar -->
+    <!-- TODO: DRY -->
+    <com.google.android.material.appbar.AppBarLayout
+        style="@style/AppBarLayoutStyle">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/top_toolbar"
+            style="@style/TopToolbar"
+            app:title="@string/edit_book_preface"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:menu="@menu/preface_actions" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/sync_toolbar_progress"
+            style="@style/SyncProgressIndicator" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

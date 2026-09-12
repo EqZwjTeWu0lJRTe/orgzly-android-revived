@@ -1,0 +1,29 @@
+Orgzly Diriliş, not almak ve yapılacaklar listelerini yönetmek için kullanılan bir taslak oluşturma aracıdır.
+
+Not defterlerinizi düz metin olarak saklayabilir ve mobil cihazınızdaki, SD kartınızdaki veya WebDAV üzerinden bir dizinle senkronize edebilirsiniz.
+
+Not defterleri Org mode dosya biçiminde kaydedilir.
+
+“Org mode, hızlı ve etkili bir düz metin sistemiyle not tutmak, yapılacaklar listelerini yönetmek, projeleri planlamak ve belgeler oluşturmak içindir.”
+
+Daha fazla bilgi için <a href='https://orgmode.org/'>orgmode.org</a> adresini ziyaret edin.
+
+ <b>Özellikler:</b>
+
+* Notlar ve görevler oluşturun, düzenleyin ve silin
+
+* Alt notları daraltın ve genişletin
+
+* Görevleri planlayın ve son tarihlerini belirleyin
+
+* Notlar için öncelikler ve etiketler belirleyin
+
+* Hızlı menüleri açmak için notları sola veya sağa kaydırın
+
+* Notları çeşitli özelliklere göre arayın
+
+* Hızlı erişim için aramalar oluşturun ve kaydedin
+
+* Not defterlerini bir veya daha fazla dizinle senkronize edin
+
+Orgzly Diriliş, Orgzly uygulamasının topluluk tarafından geliştirilmiş bir sürümüdür.

@@ -1,0 +1,57 @@
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <item
+        android:id="@+id/books_options_menu_item_widen_view"
+        android:icon="@drawable/ic_arrow_back"
+        app:showAsAction="always"
+        android:title="@string/widen_view"
+        android:visible="false"/>
+
+    <item
+        android:id="@+id/books_options_menu_item_cycle_visibility"
+        android:icon="@drawable/ic_unfold_more"
+        app:showAsAction="ifRoom"
+        android:title="@string/cycle_visibility"/>
+
+    <item
+        android:id="@+id/search_view"
+        android:title="@string/options_menu_item_search"
+        android:icon="@drawable/ic_search"
+        app:actionViewClass="androidx.appcompat.widget.SearchView"
+        app:showAsAction="collapseActionView|always" tools:ignore="AlwaysShowAction"/>
+
+    <item
+        android:id="@+id/keep_screen_on"
+        app:showAsAction="never"
+        android:checkable="true"
+        android:title="@string/keep_screen_on"/>
+
+    <item
+        android:id="@+id/books_options_menu_book_preface"
+        app:showAsAction="never"
+        android:title="@string/edit_book_preface"/>
+
+    <item
+        android:id="@+id/books_options_menu_book_filetags"
+        app:showAsAction="never"
+        android:title="@string/file_tags"/>
+
+    <!-- Title is updated depending on the number of notes in clipboard -->
+    <item
+        android:id="@+id/book_actions_paste"
+        app:showAsAction="never"
+        android:title="@string/paste"/>
+
+    <item
+        android:id="@+id/sync"
+        app:showAsAction="never"
+        android:title="@string/sync"/>
+
+    <item
+        android:id="@+id/activity_action_settings"
+        app:showAsAction="never"
+        android:title="@string/settings"/>
+</menu>

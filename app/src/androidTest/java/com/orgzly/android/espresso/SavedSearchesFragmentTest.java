@@ -1,0 +1,98 @@
+package com.orgzly.android.espresso;
+
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.Espresso.pressBack;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.action.ViewActions.longClick;
+import static androidx.test.espresso.action.ViewActions.typeText;
+import static androidx.test.espresso.assertion.ViewAssertions.doesNotExist;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.contrib.DrawerActions.open;
+import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.intent.matcher.IntentMatchers.hasAction;
+import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
+import static androidx.test.espresso.matcher.ViewMatchers.withId;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.ViewMatchers.isRoot;
+import static com.orgzly.android.espresso.util.EspressoUtils.contextualToolbarOverflowMenu;
+import static com.orgzly.android.espresso.util.EspressoUtils.onActionItemClick;
+import static com.orgzly.android.espresso.util.EspressoUtils.onSavedSearch;
+import static com.orgzly.android.espresso.util.EspressoUtils.onSnackbar;
+import static com.orgzly.android.espresso.util.EspressoUtils.replaceTextCloseKeyboard;
+import static com.orgzly.android.espresso.util.EspressoUtils.waitId;
+import static org.hamcrest.Matchers.allOf;
+
+import android.app.Activity;
+import android.app.Instrumentation;
+import android.content.Intent;
+import android.os.SystemClock;
+
+import androidx.documentfile.provider.DocumentFile;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.espresso.intent.Intents;
+
+import com.orgzly.R;
+import com.orgzly.android.LocalStorage;
+import com.orgzly.android.OrgzlyTest;
+import com.orgzly.android.RetryTestRule;
+import com.orgzly.android.ui.main.MainActivity;
+
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+
+import java.io.IOException;
+
+public class SavedSearchesFragmentTest extends OrgzlyTest {
+    @Rule
+    public RetryTestRule mRetryTestRule = new RetryTestRule();
+
+    @Before
+    public void setUp() throws Exception {
+        super.setUp();
+
+        testUtils.setupBook("book-one", "Preface\n* Note A.\n");
+
+        ActivityScenario.launch(MainActivity.class);
+
+        onView(withId(R.id.drawer_layout)).perform(open());
+        onView(withText(R.string.searches)).perform(click());
+    }
+
+    @Test
+    public void testActionModeWhenSelectingSavedSearchThenOpeningBook() {
+        onSavedSearch(0).perform(longClick());
+        onView(withId(R.id.drawer_layout)).perform(open());
+        onView(allOf(withText("book-one"), isDescendantOfA(withId(R.id.drawer_navigation_view)))).perform(click());
+        onView(withId(R.id.saved_searches_cab_move_up)).check(doesNotExist());
+    }
+
+    @Test
+    public void testMovingSavedSearchDown() {
+        onSavedSearch(0).perform(longClick());
+        onView(withId(R.id.saved_searches_cab_move_down)).perform(click());
+    }
+
+    @Test
+    public void testExportSavedSearches() throws IOException {
+        Intents.init();
+
+        // Uri to get back after sending Intent.ACTION_CREATE_DOCUMENT
+        DocumentFile file = DocumentFile.fromFile(
+                new LocalStorage(context).downloadsDirectory("searches.json"));
+        Instrumentation.ActivityResult result = new Instrumentation.ActivityResult(
+                Activity.RESULT_OK, new Intent().setData(file.getUri()));
+
+        intending(hasAction(Intent.ACTION_CREATE_DOCUMENT)).respondWith(result);
+
+        onActionItemClick(R.id.saved_searches_export, R.string.export);
+
+        onSnackbar().check(matches(withText(
+                context.getResources().getQuantityString(R.plurals.exported_searches, 4, 4))));
+
+        Intents.release();
+
+        file.delete();
+    }
+}

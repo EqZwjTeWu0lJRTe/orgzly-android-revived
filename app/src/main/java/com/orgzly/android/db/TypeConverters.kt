@@ -1,0 +1,64 @@
+@file:Suppress("unused")
+
+package com.orgzly.android.db
+
+import android.net.Uri
+import androidx.room.TypeConverter
+import com.orgzly.android.db.entity.BookAction
+import com.orgzly.android.db.entity.Tags
+import com.orgzly.android.repos.RepoType
+
+object TypeConverters {
+    @TypeConverter
+    @JvmStatic
+    fun fromTypeToString(type: BookAction.Type): String {
+        return type.toString()
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromStringToType(type: String): BookAction.Type {
+        return BookAction.Type.valueOf(type)
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromUriToString(uri: Uri?): String? {
+        return uri?.toString()
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromStringToUri(uri: String?): Uri? {
+        return if (uri == null) {
+            null
+        } else {
+            Uri.parse(uri)
+        }
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromIdToRepoType(id: Int): RepoType {
+        return RepoType.fromId(id)
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromRepoTypeToId(type: RepoType): Int {
+        return type.id
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromTagsToString(tags: Tags?): String? {
+        return tags?.takeIf { it.isNotEmpty() }?.toString()
+    }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromStringToTags(str: String?): Tags? {
+        return str?.let { Tags.fromString(it) }
+    }
+}
+

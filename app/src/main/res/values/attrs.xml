@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+    <declare-styleable name="GesturedListView">
+        <attr name="menu_container" format="reference"/>
+        <attr name="menu_for_fling_right" format="integer"/>
+        <attr name="menu_for_fling_left" format="integer"/>
+    </declare-styleable>
+
+    <declare-styleable name="IntegerRange">
+        <attr name="min" format="integer"/>
+        <attr name="max" format="integer"/>
+    </declare-styleable>
+
+    <declare-styleable name="WhatsNewChange">
+        <attr name="text" format="string"/>
+    </declare-styleable>
+
+    <declare-styleable name="FontSize">
+        <attr name="font_micro" format="dimension"/>
+        <attr name="font_small" format="dimension"/>
+        <attr name="font_medium" format="dimension"/>
+        <attr name="font_large" format="dimension"/>
+
+        <attr name="item_book_subtitle_text_size" format="dimension"/>
+        <attr name="item_book_details_text_size" format="dimension"/>
+        <attr name="item_head_book_name_text" format="dimension"/>
+        <attr name="item_head_bullet_text_size" format="dimension"/>
+        <attr name="item_head_title_text_size" format="dimension"/>
+        <attr name="item_head_fold_button_text_size" format="dimension"/>
+        <attr name="item_head_post_title_text_size" format="dimension"/>
+        <attr name="item_head_sub_title_text" format="dimension"/>
+        <attr name="item_head_sub_title_content_text" format="dimension"/>
+        <attr name="item_repo_text_size" format="dimension"/>
+
+        <attr name="fragment_note_content_text_size" format="dimension"/>
+
+        <!-- Icons sizes, but depend on set font size. -->
+        <attr name="item_book_info_icon_size" format="dimension"/>
+        <attr name="item_head_info_icon_size" format="dimension"/>
+
+        <attr name="item_head_indent_width" format="dimension"/>
+    </declare-styleable>
+
+    <declare-styleable name="ColorScheme">
+        <attr name="item_head_state_done_color" format="color"/>
+        <attr name="item_head_state_todo_color" format="color"/>
+    </declare-styleable>
+
+    <declare-styleable name="RichText">
+        <attr name="android:textSize"/>
+        <attr name="android:hint"/>
+        <attr name="android:inputType"/>
+        <attr name="android:minLines"/>
+        <attr name="android:maxLines"/>
+        <attr name="android:gravity"/>
+        <attr name="android:minHeight"/>
+        <attr name="android:imeOptions"/>
+
+        <attr name="view_id" format="reference"/>
+        <attr name="edit_id" format="reference"/>
+
+        <attr name="parse_checkboxes" format="boolean"/>
+        <attr name="linkify" format="boolean"/>
+        <attr name="editable" format="boolean"/>
+        <attr name="paddingHorizontal" format="dimension"/>
+        <attr name="paddingVertical" format="dimension"/>
+    </declare-styleable>
+
+    <declare-styleable name="ColorPickerPreference">
+        <attr name="android:defaultValue" format="string"/>
+    </declare-styleable>
+</resources>

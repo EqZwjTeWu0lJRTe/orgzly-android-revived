@@ -1,0 +1,139 @@
+name: Tests
+
+permissions:
+  contents: read
+  
+on:
+  pull_request:
+    branches:
+      - 'master'
+    paths-ignore:
+      - 'README.org'
+      - 'metadata/**'
+      - 'app/src/main/res/raw-*/*'
+      - 'app/src/main/res/values-*/*'
+      - '.github/**'
+  workflow_dispatch:
+  schedule:
+    - cron: "03 03 * * sun"
+
+jobs:
+
+  localUnitTests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Gradle build Fdroid
+        run: ./gradlew assembleFdroidDebug
+
+      - name: Gradle test Fdroid
+        run: ./gradlew testFdroidDebugUnitTest
+
+      - name: Add Dropbox API TEST credentials
+        shell: bash
+        run: |
+          echo "dropbox.refresh_token = \"${{ secrets.DROPBOX_TEST_REFRESH_TOKEN }}\"" >> app.properties
+          echo "dropbox.app_key = \"${{ secrets.DROPBOX_TEST_APP_KEY }}\"" >> app.properties
+
+      - name: Gradle test Premium
+        run: ./gradlew testPremiumDebugUnitTest
+
+  instrumentedTests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # TODO: Run on lowest and highest supported API
+        api-level: [29, 35]
+        flavor: [Fdroid, Premium]
+    steps:
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Setup Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Restore AVD cache if present
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ matrix.api-level }}
+
+      - name: create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          disable-spellchecker: true
+          profile: Nexus 6
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Save AVD to cache
+        if: always() && steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ matrix.api-level }}
+
+      - name: Add Dropbox API TEST credentials
+        shell: bash
+        run: |
+          echo "dropbox.refresh_token = \"${{ secrets.DROPBOX_TEST_REFRESH_TOKEN }}\"" >> app.properties
+          echo "dropbox.app_key = \"${{ secrets.DROPBOX_TEST_APP_KEY }}\"" >> app.properties
+
+      - name: Run instrumented tests
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a # v2.37.0
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -metrics-collection
+          disable-animations: true
+          disable-spellchecker: true
+          profile: Nexus 6
+          # Tests should use the build which includes Dropbox code.
+          script: ./gradlew --no-configuration-cache connected${{matrix.flavor}}DebugAndroidTest --no-watch-fs --build-cache --info || { ./gradlew pullScreenshot; exit 1; }
+
+      - name: Upload screenshot
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screenshot
+          path: ./build/fail-screenshot-*.png
+          if-no-files-found: ignore

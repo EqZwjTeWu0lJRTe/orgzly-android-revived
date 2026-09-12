@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    android:title="@string/ai_config">
+
+    <EditTextPreference
+        android:key="@string/pref_key_ai_api_base"
+        android:title="@string/pref_title_ai_api_base"
+        android:summary="@string/pref_summary_ai_api_base"
+        android:defaultValue=""
+        android:inputType="textUri"/>
+
+    <EditTextPreference
+        android:key="@string/pref_key_ai_api_key"
+        android:title="@string/pref_title_ai_api_key"
+        android:summary="@string/pref_summary_ai_api_key"
+        android:inputType="text"
+        android:defaultValue=""/>
+
+    <EditTextPreference
+        android:key="@string/pref_key_ai_model"
+        android:title="@string/pref_title_ai_model"
+        android:summary="@string/pref_summary_ai_model"
+        android:defaultValue="@string/pref_default_ai_model"/>
+
+    <EditTextPreference
+        android:key="@string/pref_key_ai_subtask_count"
+        android:title="@string/pref_title_ai_subtask_count"
+        android:summary="@string/pref_summary_ai_subtask_count"
+        android:defaultValue="@string/pref_default_ai_subtask_count"
+        android:inputType="number"/>
+
+    <Preference
+        android:key="ai_test"
+        android:title="@string/pref_title_ai_test"
+        android:summary="@string/pref_summary_ai_test"/>
+
+</androidx.preference.PreferenceScreen>

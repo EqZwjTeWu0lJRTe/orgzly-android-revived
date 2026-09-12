@@ -1,0 +1,119 @@
+name: Build pre-release artifacts and draft Github release
+
+on:
+  # Trigger by pushing a version tag (which are protected)
+  push:
+    tags:
+      - v*.*.*-*
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-prerelease:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Get version name from git tag
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+
+      - name: Setup Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Setup build tool version variable
+        shell: bash
+        run: |
+          BUILD_TOOL_VERSION=$(ls /usr/local/lib/android/sdk/build-tools/ | tail -n 1)
+          echo "BUILD_TOOL_VERSION=$BUILD_TOOL_VERSION" >> $GITHUB_ENV
+          echo Last build tool version is: $BUILD_TOOL_VERSION
+
+      # F-Droid APK
+
+      - name: Assemble F-Droid APK
+        run: ./gradlew assembleFdroidRelease --stacktrace
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign F-Droid APK
+        uses: r0adkll/sign-android-release@dbeba6b98a60b0fd540c02443c7f428cdedf0e7f # v1.0.4
+        id: sign_fdroid_apk
+        with:
+          releaseDirectory: app/build/outputs/apk/fdroid/release
+          signingKeyBase64: ${{ secrets.APK_SIGNING_KEYSTORE_FILE }}
+          alias: orgzly-revived-20231013
+          keyStorePassword: ${{ secrets.APK_SIGNING_KEYSTORE_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: ${{ env.BUILD_TOOL_VERSION }}
+
+      - name: Rename F-Droid APK file
+        run: mv ${{steps.sign_fdroid_apk.outputs.signedReleaseFile}} orgzly-revived-fdroid-${{ env.VERSION }}.apk
+
+      # "Premium" APK
+
+      - name: Add Dropbox app identifier
+        shell: bash
+        run: |
+          echo "dropbox.app_key = \"${{ secrets.DROPBOX_APP_KEY }}\"" >> app.properties
+          echo "dropbox.app_key_schema = \"db-${{ secrets.DROPBOX_APP_KEY }}\"" >> app.properties
+
+      - name: Assemble "premium" APK
+        run: ./gradlew assemblePremiumRelease --stacktrace
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign "premium" APK
+        uses: r0adkll/sign-android-release@dbeba6b98a60b0fd540c02443c7f428cdedf0e7f # v1.0.4
+        id: sign_premium_apk
+        with:
+          releaseDirectory: app/build/outputs/apk/premium/release
+          signingKeyBase64: ${{ secrets.APK_SIGNING_KEYSTORE_FILE }}
+          alias: orgzly-revived-20231013
+          keyStorePassword: ${{ secrets.APK_SIGNING_KEYSTORE_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: ${{ env.BUILD_TOOL_VERSION }}
+
+      - name: Rename "premium" APK file
+        run: mv ${{steps.sign_premium_apk.outputs.signedReleaseFile}} orgzly-revived-${{ env.VERSION }}.apk
+
+      # "Premium" AAB
+
+      - name: Assemble "premium" AAB
+        run: ./gradlew bundlePremiumRelease --stacktrace
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign "premium" AAB
+        uses: r0adkll/sign-android-release@dbeba6b98a60b0fd540c02443c7f428cdedf0e7f # v1.0.4
+        id: sign_premium_aab
+        with:
+          releaseDirectory: app/build/outputs/bundle/premiumRelease
+          signingKeyBase64: ${{ secrets.APK_SIGNING_KEYSTORE_FILE }}
+          alias: orgzly-revived-20231013
+          keyStorePassword: ${{ secrets.APK_SIGNING_KEYSTORE_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: ${{ env.BUILD_TOOL_VERSION }}
+
+      - name: Rename "premium" AAB file
+        run: mv ${{steps.sign_premium_aab.outputs.signedReleaseFile}} orgzly-revived-${{ env.VERSION }}.aab
+
+      - name: Upload artifacts and create Github pre-release draft
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          files: |
+            *.apk
+            *.aab
+          prerelease: true
+          draft: true

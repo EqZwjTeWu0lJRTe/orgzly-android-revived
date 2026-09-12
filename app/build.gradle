@@ -1,0 +1,285 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+android {
+    namespace = 'com.orgzly'
+
+    compileSdk 36
+
+    defaultConfig {
+        minSdkVersion 23
+        targetSdkVersion 36
+        versionCode 292
+        versionName "1.23.0"
+        applicationId = "com.orgzlyrevived"
+        resValue "string", "application_id", "com.orgzlyrevived"
+
+        testInstrumentationRunner "com.orgzly.android.OrgzlyTestRunner"
+
+        multiDexEnabled = true
+
+        buildConfigField "String", "DROPBOX_APP_KEY", gradle.ext.appProperties.getProperty("dropbox.app_key", '""')
+
+        resValue "string", "dropbox_app_key_schema", gradle.ext.appProperties.getProperty("dropbox.app_key_schema", '')
+
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments = [
+                        "room.schemaLocation": "$projectDir/schemas".toString(),
+                        "room.incremental": "true"
+                ]
+            }
+        }
+    }
+
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+        compose = true
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+
+    buildTypes {
+        release {
+            shrinkResources = true
+            minifyEnabled true
+
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            buildConfigField "boolean", "LOG_DEBUG", "false"
+
+            buildConfigField "String", "GIT_COMMIT", "\"${getCheckedOutGitCommitHash()}\""
+
+            // signingConfig signingConfigs.debug
+        }
+
+        debug {
+            buildConfigField "boolean", "LOG_DEBUG", "true"
+
+            buildConfigField "String", "DROPBOX_REFRESH_TOKEN", gradle.ext.appProperties.getProperty("dropbox.refresh_token", '""')
+
+            buildConfigField "String", "GIT_COMMIT", "\"${getCheckedOutGitCommitHash()}\""
+        }
+    }
+
+    flavorDimensions "store"
+
+    productFlavors {
+        premium {
+            buildConfigField "boolean", "IS_DROPBOX_ENABLED", "true"
+
+            // Remove Git feature because of Play restrictions on external storage permissions
+            buildConfigField "boolean", "IS_GIT_REMOVED", "true"
+
+            // Remove external files general access because of Play store restrictions on external storage permissions
+            buildConfigField "boolean", "IS_EXTERNAL_FILES_ACCESS_ALLOWED", "false"
+
+            buildConfigField "String", "VERSION_NAME_SUFFIX", '""'
+
+            dimension "store"
+        }
+
+        fdroid {
+            /*
+             * Disable Dropbox.
+             * Properties file which contains the required API key is not included with the code.
+             */
+            buildConfigField "boolean", "IS_DROPBOX_ENABLED", "false"
+
+            buildConfigField "boolean", "IS_GIT_REMOVED", "false"
+
+            buildConfigField "boolean", "IS_EXTERNAL_FILES_ACCESS_ALLOWED", "true"
+
+            buildConfigField "String", "VERSION_NAME_SUFFIX", '" (fdroid)"'
+
+            dimension "store"
+        }
+    }
+
+    androidResources {
+        generateLocaleConfig = true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = 17
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'plugin.properties']
+        }
+    }
+
+    lint {
+        checkDependencies = true
+        disable 'MissingTranslation', 'MissingQuantity', 'ImpliedQuantity', 'InvalidPackage'
+    }
+}
+
+dependencies {
+    implementation orgJavaLocation()
+
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$versions.kotlin_coroutines"
+
+    kapt "org.jetbrains.kotlin:kotlin-metadata-jvm:$versions.kotlin"
+
+    implementation "org.jetbrains:annotations:$versions.jetbrains_annotations"
+
+    implementation "androidx.multidex:multidex:$versions.android_multidex"
+
+    implementation "androidx.appcompat:appcompat:$versions.android_appcompat"
+
+    implementation "androidx.documentfile:documentfile:$versions.android_documentfile"
+    implementation "androidx.localbroadcastmanager:localbroadcastmanager:$versions.android_localbroadcastmanager"
+
+    // UI
+    implementation "androidx.cardview:cardview:$versions.android_cardview"
+    implementation "androidx.recyclerview:recyclerview:$versions.android_recyclerview"
+    implementation "androidx.viewpager:viewpager:$versions.android_viewpager"
+    implementation "androidx.constraintlayout:constraintlayout:$versions.android_constraint_layout"
+    implementation "androidx.preference:preference-ktx:$versions.android_preference"
+    implementation "com.google.android.material:material:$versions.android_material"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:$versions.android_swiperefreshlayout"
+
+    // Compose
+    def composeBom = platform("androidx.compose:compose-bom:$versions.compose")
+    implementation composeBom
+    androidTestImplementation composeBom
+    implementation 'androidx.compose.material3:material3'
+    implementation "androidx.activity:activity-compose:$versions.compose_activity"
+    implementation 'androidx.compose.runtime:runtime-livedata'
+    implementation "cl.emilym.compose:units:$versions.compose_emily_units"
+    debugImplementation "androidx.compose.ui:ui-tooling"
+    implementation "androidx.compose.ui:ui-tooling-preview"
+    debugImplementation "androidx.compose.ui:ui-test-manifest"
+    androidTestImplementation "androidx.compose.ui:ui-test-junit4"
+
+    // Room
+    implementation "androidx.room:room-runtime:$versions.android_room"
+    kapt "androidx.room:room-compiler:$versions.android_room"
+    implementation("androidx.room:room-ktx:$versions.android_room")
+
+    // Lifecycle
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$versions.android_lifecycle"
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:$versions.android_lifecycle")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$versions.android_lifecycle")
+
+    implementation "androidx.work:work-runtime-ktx:$versions.android_workmanager"
+
+    // Local JVM tests ("unit tests")
+    testImplementation(project(":shared-test"))
+    testImplementation "androidx.test.ext:junit:$versions.android_test_ext_junit"
+    testImplementation "org.robolectric:robolectric:$versions.robolectric"
+    testImplementation "io.github.atetzner:webdav-embedded-server:$versions.webdav_embedded_server"
+
+    // Android instrumented tests
+    androidTestImplementation(project(":shared-test"))
+    androidTestImplementation "androidx.test.espresso:espresso-core:$versions.android_test_espresso"
+    androidTestImplementation "androidx.test.espresso:espresso-contrib:$versions.android_test_espresso"
+    androidTestImplementation "androidx.test.espresso:espresso-intents:$versions.android_test_espresso"
+    androidTestImplementation "androidx.test:runner:$versions.android_test_runner"
+    androidTestImplementation "androidx.test:rules:$versions.android_test"
+    androidTestImplementation "androidx.test.ext:junit:$versions.android_test_ext_junit"
+    androidTestImplementation "androidx.test.uiautomator:uiautomator:$versions.android_test_uiautomator"
+    androidTestImplementation "de.sven-jacobs:loremipsum:$versions.loremipsum"
+
+    /* For running tests on lower API versions (e.g. 18) to avoid:
+     * Didn't find class "androidx.test.core.app.InstrumentationActivityInvoker$BootstrapActivity"
+     */
+    implementation "androidx.test:core:$versions.android_test"
+
+    // Dagger
+    implementation "com.google.dagger:dagger:$versions.dagger"
+    kapt "com.google.dagger:dagger-compiler:$versions.dagger"
+
+    implementation "com.google.code.gson:gson:$versions.gson"
+
+    implementation "com.dropbox.core:dropbox-core-sdk:$versions.dropbox_core_sdk"
+    implementation "com.dropbox.core:dropbox-android-sdk:$versions.dropbox_core_sdk"
+
+    implementation "com.googlecode.juniversalchardet:juniversalchardet:$versions.juniversalchardet"
+
+    implementation "joda-time:joda-time:$versions.joda_time"
+
+    implementation "com.github.bumptech.glide:glide:$versions.glide"
+
+    implementation("com.github.thegrizzlylabs:sardine-android:$versions.sardine") {
+        exclude group: 'xpp3', module: 'xpp3'
+    }
+
+    implementation('com.squareup.okhttp3:okhttp:5.3.2') {
+        because 'https://github.com/orgzly/orgzly-android/issues/880'
+    }
+
+    implementation "io.github.rburgst:okhttp-digest:$versions.okhttp_digest"
+
+    implementation("org.eclipse.jgit:org.eclipse.jgit:$versions.jgit") {
+        because 'Git repo support'
+    }
+    implementation("org.eclipse.jgit:org.eclipse.jgit.ssh.apache:$versions.jgit") {
+        because 'SSH transport support for Git repos'
+        // Avoid DuplicatePlatformClasses error:
+        exclude group: 'org.apache.sshd', module: 'sshd-sftp'
+    }
+    implementation("androidx.security:security-crypto:$versions.security_crypto") {
+        because 'SSH key generation'
+    }
+    implementation("androidx.biometric:biometric-ktx:$versions.biometric_ktx") {
+        because 'Protect SSH key with biometric prompt'
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+/*
+ * If "orgJavaDir" property is set, load org-java as a module. If property is not set,
+ * use org-java from Maven repository. See settings.gradle.
+ */
+def orgJavaLocation() {
+    if (gradle.ext.has('orgJavaDir')) {
+        logger.info("app: Using org-java from ${gradle.ext.orgJavaDir}")
+        return project(':org-java')
+    } else {
+        logger.info("app: Using com.github.orgzly-revived:org-java:$versions.org_java from Maven repository")
+        return "com.github.orgzly-revived:org-java:$versions.org_java"
+    }
+}
+
+// https://gist.github.com/JonasGroeger/7620911
+def getCheckedOutGitCommitHash() {
+    def gitFolder = "$projectDir/../.git/"
+    def takeFromHash = 12
+
+    def headFile = new File(gitFolder + "HEAD")
+    if (!headFile.exists()) {
+        return "unknown"
+    }
+
+    /*
+     * '.git/HEAD' contains either
+     *      in case of detached head: the currently checked out commit hash
+     *      otherwise: a reference to a file containing the current commit hash
+     */
+    def head = headFile.text.split(":") // .git/HEAD
+    def isCommit = head.length == 1 // e5a7c79edabbf7dd39888442df081b1c9d8e88fd
+    // def isRef = head.length > 1     // ref: refs/heads/master
+
+    if(isCommit) return head[0].trim().take(takeFromHash) // e5a7c79edabb
+
+    def refHead = new File(gitFolder + head[1].trim()) // .git/refs/heads/master
+    refHead.exists() ? refHead.text.trim().take(takeFromHash) : "unknown"
+}

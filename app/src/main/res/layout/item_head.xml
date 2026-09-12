@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/item_head_container"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- Outline color fill: starts to the right of the bullet, not the whole row. -->
+    <View
+        android:id="@+id/item_head_tint"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/item_head_bullet"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <View
+        android:id="@+id/item_head_top"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:background="@color/green_900"
+        android:visibility="invisible"/>
+
+    <View
+        android:id="@+id/item_head_bottom"
+        app:layout_constraintTop_toBottomOf="@id/item_head_content"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:background="@color/red_900"
+        android:visibility="invisible"/>
+
+    <!-- Anchor for the first line -->
+    <TextView
+        android:id="@+id/item_head_first_line_anchor"
+        android:layout_width="42dp"
+        android:layout_height="wrap_content"
+        android:textSize="?attr/item_head_title_text_size"
+        android:visibility="invisible"
+        app:layout_constraintTop_toBottomOf="@id/item_head_top"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Indent -->
+    <LinearLayout
+        android:id="@+id/item_head_indent_container"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_bottom"
+        app:layout_constraintStart_toEndOf="@+id/item_head_book_name_before_note_text">
+
+        <!--
+          Optimal number of indents. We want to avoid inflating as much as possible
+          and prefer changing visibility.
+          -->
+        <include layout="@layout/indent" />
+        <include layout="@layout/indent" />
+        <include layout="@layout/indent" />
+        <include layout="@layout/indent" />
+
+    </LinearLayout>
+
+    <!-- Bullet -->
+    <ImageView
+        android:id="@+id/item_head_bullet"
+        android:layout_width="?attr/item_head_indent_width"
+        android:layout_height="wrap_content"
+        android:src="@drawable/bullet"
+        android:visibility="visible"
+        android:layout_marginEnd="@dimen/bullet_margin"
+        app:layout_constraintTop_toTopOf="@id/item_head_first_line_anchor"
+        app:layout_constraintBottom_toBottomOf="@id/item_head_first_line_anchor"
+        app:layout_constraintStart_toEndOf="@+id/item_head_indent_container"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_level" />
+
+    <!-- Heading level marker (H1, H2, ...) -->
+    <TextView
+        android:id="@+id/item_head_level"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="4dp"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="10sp"
+        android:gravity="center_vertical"
+        tools:text="H1"
+        app:layout_constraintTop_toTopOf="@id/item_head_first_line_anchor"
+        app:layout_constraintBottom_toBottomOf="@id/item_head_first_line_anchor"
+        app:layout_constraintStart_toEndOf="@+id/item_head_bullet"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_title" />
+
+    <!-- Title -->
+    <com.orgzly.android.ui.views.richtext.RichText
+        android:id="@+id/item_head_title"
+        app:view_id="@+id/item_head_title_view"
+        app:edit_id="@+id/item_head_title_edit"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textSize="?attr/item_head_title_text_size"
+        android:textStyle="bold"
+        android:minHeight="@dimen/bullet_total_size"
+        app:layout_constraintTop_toTopOf="@id/item_head_first_line_anchor"
+        app:layout_constraintStart_toEndOf="@+id/item_head_level"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_clock"
+        android:inputType="text"
+        app:editable="false" />
+
+    <!-- Manual stopwatch (start/stop by tapping the icon). -->
+    <LinearLayout
+        android:id="@+id/item_head_clock"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/item_head_first_line_anchor"
+        app:layout_constraintBottom_toBottomOf="@id/item_head_first_line_anchor"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text">
+
+        <ImageView
+            android:id="@+id/item_head_clock_icon"
+            android:layout_width="?attr/item_head_info_icon_size"
+            android:layout_height="?attr/item_head_info_icon_size"
+            android:src="@drawable/ic_hourglass_empty"
+            android:contentDescription="@string/start_stop_timer" />
+
+        <TextView
+            android:id="@+id/item_head_clock_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:minWidth="40dp"
+            android:textColor="?android:attr/textColorTertiary"
+            android:textSize="?attr/item_head_sub_title_text"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Notebook's name. -->
+    <ImageView
+        android:id="@+id/item_head_book_name_icon"
+        android:layout_width="?attr/item_head_info_icon_size"
+        android:layout_height="0dp"
+        android:src="@drawable/ic_folder_open"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_title"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_book_name_text"
+        app:layout_constraintStart_toStartOf="@+id/item_head_title" />
+    <TextView
+        android:id="@+id/item_head_book_name_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="?attr/item_head_sub_title_text"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_title"
+        app:layout_constraintStart_toEndOf="@+id/item_head_book_name_icon"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text"
+        tools:text="@string/book_name_sample" />
+
+    <!-- Notebook's name before note. -->
+    <TextView
+        android:id="@+id/item_head_book_name_before_note_text"
+        android:layout_width="@dimen/item_head_book_name_width"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/bullet_total_size"
+        app:layout_constraintBaseline_toBaselineOf="@id/item_head_first_line_anchor"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginEnd="@dimen/screen_edge"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="?attr/item_head_book_name_text"
+        android:textStyle="italic"
+        tools:text="@string/book_name_sample"
+        android:visibility="invisible"/>
+
+    <!-- Scheduled time -->
+    <ImageView
+        android:id="@+id/item_head_scheduled_icon"
+        android:layout_width="?attr/item_head_info_icon_size"
+        android:layout_height="0dp"
+        android:src="@drawable/ic_today"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_book_name_text"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_scheduled_text"
+        app:layout_constraintStart_toStartOf="@+id/item_head_book_name_icon" />
+    <TextView
+        android:id="@+id/item_head_scheduled_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="?attr/item_head_sub_title_text"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_book_name_text"
+        app:layout_constraintStart_toEndOf="@+id/item_head_scheduled_icon"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text"
+        tools:text="@string/note_scheduled_sample" />
+
+    <!-- Deadline time -->
+    <ImageView
+        android:id="@+id/item_head_deadline_icon"
+        android:layout_width="?attr/item_head_info_icon_size"
+        android:layout_height="0dp"
+        android:src="@drawable/ic_alarm"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_scheduled_text"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_deadline_text"
+        app:layout_constraintStart_toStartOf="@+id/item_head_scheduled_icon" />
+    <TextView
+        android:id="@+id/item_head_deadline_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="?attr/item_head_sub_title_text"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_scheduled_text"
+        app:layout_constraintStart_toEndOf="@+id/item_head_deadline_icon"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text"
+        tools:text="@string/note_deadline_sample" />
+
+    <!-- Event time -->
+    <ImageView
+        android:id="@+id/item_head_event_icon"
+        android:layout_width="?attr/item_head_info_icon_size"
+        android:layout_height="0dp"
+        android:src="@drawable/ic_access_time"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_deadline_text"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_event_text"
+        app:layout_constraintStart_toStartOf="@+id/item_head_deadline_icon" />
+    <TextView
+        android:id="@+id/item_head_event_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="?attr/item_head_sub_title_text"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_deadline_text"
+        app:layout_constraintStart_toEndOf="@+id/item_head_event_icon"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text"
+        tools:text="@string/note_event_sample" />
+
+    <!-- Closed time -->
+    <ImageView
+        android:id="@+id/item_head_closed_icon"
+        android:layout_width="?attr/item_head_info_icon_size"
+        android:layout_height="0dp"
+        android:src="@drawable/ic_check_circle_outline"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_event_text"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_closed_text"
+        app:layout_constraintStart_toStartOf="@+id/item_head_event_icon" />
+    <TextView
+        android:id="@+id/item_head_closed_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textColor="?android:attr/textColorTertiary"
+        android:textSize="?attr/item_head_sub_title_text"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_event_text"
+        app:layout_constraintStart_toEndOf="@+id/item_head_closed_icon"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text"
+        tools:text="@string/note_closed_sample" />
+
+    <!-- Content -->
+    <com.orgzly.android.ui.views.richtext.RichText
+        android:id="@+id/item_head_content"
+        app:view_id="@+id/item_head_content_view"
+        app:edit_id="@+id/item_head_content_edit"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textSize="?attr/item_head_sub_title_content_text"
+        android:textColor="?android:attr/textColorSecondary"
+        app:layout_constraintTop_toBottomOf="@+id/item_head_closed_text"
+        app:layout_constraintStart_toStartOf="@+id/item_head_title"
+        app:layout_constraintEnd_toStartOf="@+id/item_head_fold_button_text"
+        app:editable="false"
+        android:inputType="textMultiLine"
+        android:visibility="visible" />
+
+    <!-- Folding button -->
+    <View
+        android:id="@+id/item_head_fold_button"
+        android:layout_width="@dimen/fold_button_width"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@+id/item_head_top"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_bottom"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Folding button text -->
+    <TextView
+        android:id="@+id/item_head_fold_button_text"
+        android:layout_width="@dimen/fold_button_width"
+        android:layout_height="0dp"
+        android:gravity="top|center_horizontal"
+        android:minHeight="@dimen/bullet_total_size"
+        android:text="@string/unfold_button_character"
+        android:textSize="?attr/item_head_fold_button_text_size"
+        app:layout_constraintTop_toTopOf="@+id/item_head_title"
+        app:layout_constraintBottom_toBottomOf="@+id/item_head_content"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
