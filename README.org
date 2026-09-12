@@ -35,6 +35,44 @@ http://orgmode.org for more information.
 
 The Orgzly Revived project aims to continue development of the Orgzly application. The rebranding is due to the disappearance of the Orgzly author so we, as the community, had to come up with a new solution. We plan to continue adding useful features, fixing bugs, keeping up-to-date with technological evolution, and generally maintaining the [[https://orgmode.org/][Org Mode]] outreach and its support on Android. Orgzly Revived is a community-maintained version of Orgzly, as the development of the original app is no longer active.
 
+* This fork (AI & outline enhancements)
+
+This repository is a personal fork of [[https://github.com/orgzly-revived/orgzly-android-revived][Orgzly Revived]] (GPLv3) adding AI-assisted
+task planning and several outline/UX improvements. It keeps full compatibility with
+the Org file format and with upstream behaviour.
+
+** Added features
+
+- *AI task decomposition ("AI decompose")*: long-press a note and generate one level
+  of subtasks through any OpenAI-compatible API. Offers per-run options (subtask count
+  and an optional refine hint) and re-generation. Context sent can include the note
+  title, its ancestor chain and its body.
+- *AI polish*: send a whole note subtree (headings + bodies) to the AI and replace it
+  with the improved Org outline after previewing the result.
+- *Today view as the landing page*: groups Overdue, Due today, Scheduled today and
+  Repeating today (with a 1-year activity window for repeating tasks), completion and
+  time statistics (EFFORT / stopwatch), coloured group fills, mini progress bars,
+  one-tap complete, pull-to-refresh and a settings shortcut.
+- *Outline colour scale*: long-press a top-level note to pick an accent colour; its
+  subtree is shaded in stepped tones by depth (soft, never garish solid colours).
+- *Manual stopwatch* per note (screen-off safe) with subtree totals, stored only in
+  private =:PROPERTIES:= so files stay compatible.
+- Widget polish, SAF repository path decoding, calendar export helper and other fixes.
+
+** Build this fork
+
+#+begin_src shell
+./gradlew :app:assembleFdroidDebug
+#+end_src
+
+The APK is written to =app/build/outputs/apk/fdroid/debug/=.
+
+** License
+
+Distributed under the GNU General Public License v3, same as upstream.
+See [[file:LICENSE]].
+
+
 * Support 
 
 - See the detailed [[https://github.com/orgzly-revived/documentation][End-user documentation]]
